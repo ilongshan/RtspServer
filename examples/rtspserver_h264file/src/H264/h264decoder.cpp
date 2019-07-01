@@ -14,11 +14,11 @@ h264Decoder::h264Decoder()
 
 UINT Ue(BYTE *pBuff, UINT nLen, UINT &nStartBit)
 {
-    //¼ÆËã0bitµÄ¸öÊı
+    //è®¡ç®—0bitçš„ä¸ªæ•°
     UINT nZeroNum = 0;
     while (nStartBit < nLen * 8)
     {
-        if (pBuff[nStartBit / 8] & (0x80 >> (nStartBit % 8))) //&:°´Î»Óë£¬%È¡Óà
+        if (pBuff[nStartBit / 8] & (0x80 >> (nStartBit % 8))) //&:æŒ‰ä½ä¸ï¼Œ%å–ä½™
         {
             break;
         }
@@ -28,7 +28,7 @@ UINT Ue(BYTE *pBuff, UINT nLen, UINT &nStartBit)
     nStartBit ++;
 
 
-    //¼ÆËã½á¹û
+    //è®¡ç®—ç»“æœ
     DWORD dwRet = 0;
     for (UINT i=0; i<nZeroNum; i++)
     {
@@ -46,7 +46,7 @@ int Se(BYTE *pBuff, UINT nLen, UINT &nStartBit)
 {
     int UeVal=Ue(pBuff,nLen,nStartBit);
     double k=UeVal;
-    int nValue=ceil(k/2);//ceilº¯Êı£ºceilº¯ÊıµÄ×÷ÓÃÊÇÇó²»Ğ¡ÓÚ¸ø¶¨ÊµÊıµÄ×îĞ¡ÕûÊı¡£ceil(2)=ceil(1.2)=cei(1.5)=2.00
+    int nValue=ceil(k/2);//ceilå‡½æ•°ï¼šceilå‡½æ•°çš„ä½œç”¨æ˜¯æ±‚ä¸å°äºç»™å®šå®æ•°çš„æœ€å°æ•´æ•°ã€‚ceil(2)=ceil(1.2)=cei(1.5)=2.00
     if (UeVal % 2==0)
         nValue=-nValue;
     return nValue;
@@ -68,11 +68,11 @@ DWORD u(UINT BitCount,BYTE * buf,UINT &nStartBit)
 }
 
 /**
- * H264µÄNALÆğÊ¼Âë·À¾ºÕù»úÖÆ
+ * H264çš„NALèµ·å§‹ç é˜²ç«äº‰æœºåˆ¶
  *
- * @param buf SPSÊı¾İÄÚÈİ
+ * @param buf SPSæ•°æ®å†…å®¹
  *
- * @ÎŞ·µ»ØÖµ
+ * @æ— è¿”å›å€¼
  */
 void de_emulation_prevention(BYTE* buf,unsigned int* buf_size)
 {
@@ -99,15 +99,6 @@ void de_emulation_prevention(BYTE* buf,unsigned int* buf_size)
     }
 }
 
-/**
- * ½âÂëSPS,»ñÈ¡ÊÓÆµÍ¼Ïñ¿í¡¢¸ßºÍÖ¡ÂÊĞÅÏ¢
- *
- * @param buf SPSÊı¾İÄÚÈİ
- * @param nLen SPSÊı¾İµÄ³¤¶È
- * @param width Í¼Ïñ¿í¶È
- * @param height Í¼Ïñ¸ß¶È
- * @³É¹¦Ôò·µ»Øtrue , Ê§°ÜÔò·µ»Øfalse
- */
 bool h264Decoder::decodeSps(BYTE * buf,unsigned int nLen,int &width,int &height,int &fps)
 {
     UINT StartBit=0;
@@ -188,8 +179,7 @@ bool h264Decoder::decodeSps(BYTE * buf,unsigned int nLen,int &width,int &height,
         int vui_parameter_present_flag=u(1,buf,StartBit);
 //RTSP_LogPrintf("vui_parameter_present_flag = %d \n", vui_parameter_present_flag);
 
-        //vui_parameters_present_flag ¸ºÔğÊÇ·ñ´øÖ¡ÂÊ
-
+        ///vui_parameters_present_flag è´Ÿè´£æ˜¯å¦å¸¦å¸§ç‡
         if(vui_parameter_present_flag)
         {
             int aspect_ratio_info_present_flag=u(1,buf,StartBit);
@@ -232,7 +222,8 @@ bool h264Decoder::decodeSps(BYTE * buf,unsigned int nLen,int &width,int &height,
                 int time_scale=u(32,buf,StartBit);
                 fps=time_scale/num_units_in_tick;
                 int fixed_frame_rate_flag=u(1,buf,StartBit);
-                if(fixed_frame_rate_flag)
+
+//                if(fixed_frame_rate_flag)
                 {
                     fps=fps/2;
                 }

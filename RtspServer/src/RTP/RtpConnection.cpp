@@ -2,253 +2,18 @@
 
 #include "types.h"
 #include "Log/log.h"
+#include "AppConfig.h"
 
-#define H264        96
+#define RTP_HEADER_SIZE 12
+
+#define H264   96
+#define AAC    97
+#define G711A  97
 
 RtpConnection::RtpConnection()
 {
 
 }
-
-void RtpConnection::sendAnNalu(NALU_t *n, int framerate)
-{
-    int socket1;
-    if (is_over_tcp)
-    {
-        socket1 = this->tcp_sockfd;
-    }
-    else
-    {
-        socket1 = this->udp_sockfd[0];
-    }
-
-    char* nalu_payload;
-    char sendbuf[1500] = {0};
-
-    int	bytes=0;
-
-    if (framerate <= 0)
-    {
-        framerate = 15;
-    }
-
-    timestamp_increse=(unsigned int)(90000.0 / framerate);
-
-//    printf("start send ...\n");
-
-    memset(sendbuf,0,1500);//Çå¿Õsendbuf£»´ËÊ±»á½«ÉÏ´ÎµÄÊ±¼ä´ÁÇå¿Õ£¬Òò´ËĞèÒªts_currentÀ´±£´æÉÏ´ÎµÄÊ±¼ä´ÁÖµ
-//rtp¹Ì¶¨°üÍ·£¬Îª12×Ö½Ú,¸Ã¾ä½«sendbuf[0]µÄµØÖ·¸³¸ørtp_hdr£¬ÒÔºó¶Ôrtp_hdrµÄĞ´Èë²Ù×÷½«Ö±½ÓĞ´Èësendbuf¡£
-    rtp_hdr =(RTP_FIXED_HEADER*)&sendbuf[0];
-    //ÉèÖÃRTP HEADER£¬
-    rtp_hdr->payload     = H264;  //¸ºÔØÀàĞÍºÅ£¬
-    rtp_hdr->version     = 2;  //°æ±¾ºÅ£¬´Ë°æ±¾¹Ì¶¨Îª2
-    rtp_hdr->marker      = 0;   //±êÖ¾Î»£¬ÓÉ¾ßÌåĞ­Òé¹æ¶¨ÆäÖµ¡£
-    rtp_hdr->ssrc        = htonl(ssrc);    //Ëæ»úÖ¸¶¨Îª10£¬²¢ÇÒÔÚ±¾RTP»á»°ÖĞÈ«¾ÖÎ¨Ò»
-//RTSP_LogPrintf("### %d %d\n", n->len, is_over_tcp);
-//	µ±Ò»¸öNALUĞ¡ÓÚ1400×Ö½ÚµÄÊ±ºò£¬²ÉÓÃÒ»¸öµ¥RTP°ü·¢ËÍ
-    if(n->len<=1400)
-    {
-        //ÉèÖÃrtp M Î»£»
-        rtp_hdr->marker=1;
-        rtp_hdr->seq_no     = htons(seq_num ++); //ĞòÁĞºÅ£¬Ã¿·¢ËÍÒ»¸öRTP°üÔö1
-        //ÉèÖÃNALU HEADER,²¢½«Õâ¸öHEADERÌîÈësendbuf[12]
-        nalu_hdr =(NALU_HEADER*)&sendbuf[12]; //½«sendbuf[12]µÄµØÖ·¸³¸ønalu_hdr£¬Ö®ºó¶Ônalu_hdrµÄĞ´Èë¾Í½«Ğ´ÈësendbufÖĞ£»
-        nalu_hdr->F=n->forbidden_bit;
-        nalu_hdr->NRI=n->nal_reference_idc>>5;//ÓĞĞ§Êı¾İÔÚn->nal_reference_idcµÄµÚ6£¬7Î»£¬ĞèÒªÓÒÒÆ5Î»²ÅÄÜ½«ÆäÖµ¸³¸ønalu_hdr->NRI¡£
-        nalu_hdr->TYPE=n->nal_unit_type;
-
-        nalu_payload=&sendbuf[13];//Í¬Àí½«sendbuf[13]¸³¸ønalu_payload
-        memcpy(nalu_payload,n->buf+1,n->len-1);//È¥µônaluÍ·µÄnaluÊ£ÓàÄÚÈİĞ´Èësendbuf[13]¿ªÊ¼µÄ×Ö·û´®¡£
-
-        ts_current=ts_current+timestamp_increse;
-        rtp_hdr->timestamp=htonl(ts_current);
-        bytes=n->len + 12 ;						//»ñµÃsendbufµÄ³¤¶È,ÎªnaluµÄ³¤¶È£¨°üº¬NALUÍ·µ«³ıÈ¥ÆğÊ¼Ç°×º£©¼ÓÉÏrtp_headerµÄ¹Ì¶¨³¤¶È12×Ö½Ú
-
-        uint8_t szbuf[4] = {0};
-        if (is_over_tcp)
-        {
-            int sockfd = tcp_sockfd;
-            int size = bytes;
-            szbuf[0] = '$';
-            szbuf[1] = tcp_interleaved;
-            //szbuf[2] = (char)((size & 0xFF00) >> 8);
-            //szbuf[3] = (char)(size & 0xFF);
-            *((uint16_t*)&szbuf[2]) = htons(size);
-            int ret = send(sockfd, (const char*)szbuf, 4, 0);
-            if (ret < 0)
-            {
-                err("rtp send interlaced frame failed: %s\n", strerror(errno));
-                return;
-            }
-        }
-
-        send( socket1, sendbuf, bytes, 0 );//·¢ËÍrtp°ü
-    }
-    else if(n->len>1400)
-    {
-        ///µÃµ½¸ÃnaluĞèÒªÓÃ¶àÉÙ³¤¶ÈÎª1400×Ö½ÚµÄRTP°üÀ´·¢ËÍ
-        int packetNums = n->len/1400;//ĞèÒªk¸ö1400×Ö½ÚµÄRTP°ü
-        int lastPacketSize = n->len%1400;//×îºóÒ»¸öRTP°üµÄĞèÒª×°ÔØµÄ×Ö½ÚÊı
-        if (lastPacketSize == 0)
-        {
-            lastPacketSize = 1400;
-        }
-        else
-        {
-            packetNums++;
-        }
-
-        int currentPacketIndex = 0; //µ±Ç°·¢ËÍµÄ°üĞòºÅ
-
-        ts_current=ts_current+timestamp_increse;
-        rtp_hdr->timestamp=htonl(ts_current);
-
-        while(currentPacketIndex < packetNums)
-        {
-            rtp_hdr->seq_no = htons(seq_num ++); //ĞòÁĞºÅ£¬Ã¿·¢ËÍÒ»¸öRTP°üÔö1
-
-            if(currentPacketIndex == 0)//·¢ËÍÒ»¸öĞèÒª·ÖÆ¬µÄNALUµÄµÚÒ»¸ö·ÖÆ¬£¬ÖÃFU HEADERµÄSÎ»
-            {
-                //ÉèÖÃrtp M Î»£»
-                rtp_hdr->marker=0;
-                //ÉèÖÃFU INDICATOR,²¢½«Õâ¸öHEADERÌîÈësendbuf[12]
-                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //½«sendbuf[12]µÄµØÖ·¸³¸øfu_ind£¬Ö®ºó¶Ôfu_indµÄĞ´Èë¾Í½«Ğ´ÈësendbufÖĞ£»
-                fu_ind->F=n->forbidden_bit;
-                fu_ind->NRI=n->nal_reference_idc>>5;
-                fu_ind->TYPE=28;
-
-                //ÉèÖÃFU HEADER,²¢½«Õâ¸öHEADERÌîÈësendbuf[13]
-                fu_hdr =(FU_HEADER*)&sendbuf[13];
-                fu_hdr->E=0;
-                fu_hdr->R=0;
-                fu_hdr->S=1;
-                fu_hdr->TYPE=n->nal_unit_type;
-
-                nalu_payload=&sendbuf[14];//Í¬Àí½«sendbuf[14]¸³¸ønalu_payload
-                memcpy(nalu_payload,n->buf+1,1400-1);//È¥µôNALUÍ·
-
-                bytes=1400-1+14; //»ñµÃsendbufµÄ³¤¶È,ÎªnaluµÄ³¤¶È£¨³ıÈ¥ÆğÊ¼Ç°×ººÍNALUÍ·£©¼ÓÉÏrtp_header£¬fu_ind£¬fu_hdrµÄ¹Ì¶¨³¤¶È14×Ö½Ú
-
-                uint8_t szbuf[4] = {0};
-                if (is_over_tcp)
-                {
-                    int sockfd = tcp_sockfd;
-                    int size = bytes;
-                    szbuf[0] = '$';
-                    szbuf[1] = tcp_interleaved;
-                    //szbuf[2] = (char)((size & 0xFF00) >> 8);
-                    //szbuf[3] = (char)(size & 0xFF);
-                    *((uint16_t*)&szbuf[2]) = htons(size);
-                    int ret = send(sockfd, (const char*)szbuf, 4, 0);
-                    if (ret < 0)
-                    {
-                        err("rtp send interlaced frame failed: %s\n", strerror(errno));
-                        return;
-                    }
-                }
-
-                send( socket1, sendbuf, bytes, 0 );//·¢ËÍrtp°ü
-
-            }
-            //·¢ËÍÒ»¸öĞèÒª·ÖÆ¬µÄNALUµÄ·ÇµÚÒ»¸ö·ÖÆ¬£¬ÇåÁãFU HEADERµÄSÎ»£¬Èç¹û¸Ã·ÖÆ¬ÊÇ¸ÃNALUµÄ×îºóÒ»¸ö·ÖÆ¬£¬ÖÃFU HEADERµÄEÎ»
-            else if(currentPacketIndex==(packetNums-1))//·¢ËÍµÄÊÇ×îºóÒ»¸ö·ÖÆ¬£¬×¢Òâ×îºóÒ»¸ö·ÖÆ¬µÄ³¤¶È¿ÉÄÜ³¬¹ı1400×Ö½Ú£¨µ±l>1386Ê±£©¡£
-            {
-
-                //ÉèÖÃrtp M Î»£»µ±Ç°´«ÊäµÄÊÇ×îºóÒ»¸ö·ÖÆ¬Ê±¸ÃÎ»ÖÃ1
-                rtp_hdr->marker=1;
-                //ÉèÖÃFU INDICATOR,²¢½«Õâ¸öHEADERÌîÈësendbuf[12]
-                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //½«sendbuf[12]µÄµØÖ·¸³¸øfu_ind£¬Ö®ºó¶Ôfu_indµÄĞ´Èë¾Í½«Ğ´ÈësendbufÖĞ£»
-                fu_ind->F=n->forbidden_bit;
-                fu_ind->NRI=n->nal_reference_idc>>5;
-                fu_ind->TYPE=28;
-
-                //ÉèÖÃFU HEADER,²¢½«Õâ¸öHEADERÌîÈësendbuf[13]
-                fu_hdr =(FU_HEADER*)&sendbuf[13];
-                fu_hdr->R=0;
-                fu_hdr->S=0;
-                fu_hdr->TYPE=n->nal_unit_type;
-                fu_hdr->E=1;
-
-                nalu_payload=&sendbuf[14];//Í¬Àí½«sendbuf[14]µÄµØÖ·¸³¸ønalu_payload
-                memcpy(nalu_payload,n->buf+currentPacketIndex*1400,lastPacketSize);//½«nalu×îºóÊ£ÓàµÄl-1(È¥µôÁËÒ»¸ö×Ö½ÚµÄNALUÍ·)×Ö½ÚÄÚÈİĞ´Èësendbuf[14]¿ªÊ¼µÄ×Ö·û´®¡£
-                bytes=lastPacketSize+14;		//»ñµÃsendbufµÄ³¤¶È,ÎªÊ£ÓànaluµÄ³¤¶Èl-1¼ÓÉÏrtp_header£¬FU_INDICATOR,FU_HEADERÈı¸ö°üÍ·¹²14×Ö½Ú
-
-                uint8_t szbuf[4] = {0};
-                if (is_over_tcp)
-                {
-                    int sockfd = tcp_sockfd;
-                    int size = bytes;
-                    szbuf[0] = '$';
-                    szbuf[1] = tcp_interleaved;
-                    //szbuf[2] = (char)((size & 0xFF00) >> 8);
-                    //szbuf[3] = (char)(size & 0xFF);
-                    *((uint16_t*)&szbuf[2]) = htons(size);
-                    int ret = send(sockfd, (const char*)szbuf, 4, 0);
-                    if (ret < 0)
-                    {
-                        err("rtp send interlaced frame failed: %s\n", strerror(errno));
-                        return;
-                    }
-                }
-
-                send( socket1, sendbuf, bytes, 0 );//·¢ËÍrtp°ü
-
-                break; //×îºóÒ»¸ö·ÖÆ¬µÄ»° ÔòÍË³öÑ­»· ²»Ö´ĞĞºóÃæµÄsleep
-            }
-            else //if(t<k&&0!=t)
-            {
-                //ÉèÖÃrtp M Î»£»
-                rtp_hdr->marker=0;
-                //ÉèÖÃFU INDICATOR,²¢½«Õâ¸öHEADERÌîÈësendbuf[12]
-                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //½«sendbuf[12]µÄµØÖ·¸³¸øfu_ind£¬Ö®ºó¶Ôfu_indµÄĞ´Èë¾Í½«Ğ´ÈësendbufÖĞ£»
-                fu_ind->F=n->forbidden_bit;
-                fu_ind->NRI=n->nal_reference_idc>>5;
-                fu_ind->TYPE=28;
-
-                //ÉèÖÃFU HEADER,²¢½«Õâ¸öHEADERÌîÈësendbuf[13]
-                fu_hdr =(FU_HEADER*)&sendbuf[13];
-                //fu_hdr->E=0;
-                fu_hdr->R=0;
-                fu_hdr->S=0;
-                fu_hdr->E=0;
-                fu_hdr->TYPE=n->nal_unit_type;
-
-                nalu_payload=&sendbuf[14];//Í¬Àí½«sendbuf[14]µÄµØÖ·¸³¸ønalu_payload
-                memcpy(nalu_payload,n->buf+currentPacketIndex*1400,1400);//È¥µôÆğÊ¼Ç°×ºµÄnaluÊ£ÓàÄÚÈİĞ´Èësendbuf[14]¿ªÊ¼µÄ×Ö·û´®¡£
-                bytes=1400+14;						//»ñµÃsendbufµÄ³¤¶È,ÎªnaluµÄ³¤¶È£¨³ıÈ¥Ô­NALUÍ·£©¼ÓÉÏrtp_header£¬fu_ind£¬fu_hdrµÄ¹Ì¶¨³¤¶È14×Ö½Ú
-
-                uint8_t szbuf[4] = {0};
-                if (is_over_tcp)
-                {
-                    int sockfd = tcp_sockfd;
-                    int size = bytes;
-                    szbuf[0] = '$';
-                    szbuf[1] = tcp_interleaved;
-                    //szbuf[2] = (char)((size & 0xFF00) >> 8);
-                    //szbuf[3] = (char)(size & 0xFF);
-                    *((uint16_t*)&szbuf[2]) = htons(size);
-                    int ret = send(sockfd, (const char*)szbuf, 4, 0);
-                    if (ret < 0)
-                    {
-                        err("rtp send interlaced frame failed: %s\n", strerror(errno));
-                        return;
-                    }
-                }
-
-                send( socket1, sendbuf, bytes, 0 );//·¢ËÍrtp°ü
-
-            }
-
-            currentPacketIndex++;
-
-            Sleep(2); //ĞİÃß2Ms ²»ÄÜ·¢Ì«¿ìÁË
-        }
-    }
-
-//    printf("send finished\n");
-
-}
-
 
 unsigned long RtpConnection::RtpGenSsrc()
 {
@@ -377,3 +142,284 @@ RtpConnection *RtpConnection::newRtpConnectionOverUdp(const char *peer_ip, int p
     return rtp;
 }
 
+bool RtpConnection::doSend(const uint8_t *buffer, const int &size)
+{
+    int socket1;
+    if (is_over_tcp)
+    {
+        socket1 = this->tcp_sockfd;
+    }
+    else
+    {
+        socket1 = this->udp_sockfd[0];
+    }
+
+    uint8_t szbuf[4] = {0};
+    if (is_over_tcp)
+    {
+        int sockfd = tcp_sockfd;
+        szbuf[0] = '$';
+        szbuf[1] = tcp_interleaved;
+        //szbuf[2] = (char)((size & 0xFF00) >> 8);
+        //szbuf[3] = (char)(size & 0xFF);
+        *((uint16_t*)&szbuf[2]) = htons(size);
+        int ret = send(sockfd, (const char*)szbuf, 4, 0);
+        if (ret < 0)
+        {
+            err("rtp send interlaced frame failed: %s\n", strerror(errno));
+            return false;
+        }
+    }
+
+    int ret = send(socket1, (const char*)buffer, size, 0 );//å‘é€rtpåŒ…
+
+    if (ret < 0)
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+
+}
+
+bool RtpConnection::sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    NALU_t *n = getNALU(frame, len);
+
+    bool isSucceed = false;
+
+    RTP_FIXED_HEADER        *rtp_hdr;
+
+    NALU_HEADER		*nalu_hdr;
+    FU_INDICATOR	*fu_ind;
+    FU_HEADER		*fu_hdr;
+
+    uint8_t* nalu_payload;
+    uint8_t sendbuf[1500] = {0};
+
+    int	bytes=0;
+
+    int socket1;
+    if (is_over_tcp)
+    {
+        socket1 = this->tcp_sockfd;
+    }
+    else
+    {
+        socket1 = this->udp_sockfd[0];
+    }
+
+    uint32_t rtp_ts = (uint32_t)(timestamp * sample_rate / 1000000);
+
+//    printf("start send ...\n");
+
+//rtpå›ºå®šåŒ…å¤´ï¼Œä¸º12å­—èŠ‚,è¯¥å¥å°†sendbuf[0]çš„åœ°å€èµ‹ç»™rtp_hdrï¼Œä»¥åå¯¹rtp_hdrçš„å†™å…¥æ“ä½œå°†ç›´æ¥å†™å…¥sendbufã€‚
+    rtp_hdr =(RTP_FIXED_HEADER*)&sendbuf[0];
+    //è®¾ç½®RTP HEADERï¼Œ
+    rtp_hdr->payload     = H264;  //è´Ÿè½½ç±»å‹å·ï¼Œ
+    rtp_hdr->version     = 2;  //ç‰ˆæœ¬å·ï¼Œæ­¤ç‰ˆæœ¬å›ºå®šä¸º2
+    rtp_hdr->marker      = 0;   //æ ‡å¿—ä½ï¼Œç”±å…·ä½“åè®®è§„å®šå…¶å€¼ã€‚
+    rtp_hdr->ssrc        = htonl(ssrc);    //éœ€è¦åœ¨æœ¬RTPä¼šè¯ä¸­å…¨å±€å”¯ä¸€
+//RTSP_LogPrintf("### %d %d\n", n->len, is_over_tcp);
+//	å½“ä¸€ä¸ªNALUå°äº1400å­—èŠ‚çš„æ—¶å€™ï¼Œé‡‡ç”¨ä¸€ä¸ªå•RTPåŒ…å‘é€
+    if(n->len<=1400)
+    {
+        //è®¾ç½®rtp M ä½ï¼›
+        rtp_hdr->marker=1;
+        rtp_hdr->seq_no     = htons(seq_num ++); //åºåˆ—å·ï¼Œæ¯å‘é€ä¸€ä¸ªRTPåŒ…å¢1
+        //è®¾ç½®NALU HEADER,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[12]
+        nalu_hdr =(NALU_HEADER*)&sendbuf[12]; //å°†sendbuf[12]çš„åœ°å€èµ‹ç»™nalu_hdrï¼Œä¹‹åå¯¹nalu_hdrçš„å†™å…¥å°±å°†å†™å…¥sendbufä¸­ï¼›
+        nalu_hdr->F=n->forbidden_bit;
+        nalu_hdr->NRI=n->nal_reference_idc>>5;//æœ‰æ•ˆæ•°æ®åœ¨n->nal_reference_idcçš„ç¬¬6ï¼Œ7ä½ï¼Œéœ€è¦å³ç§»5ä½æ‰èƒ½å°†å…¶å€¼èµ‹ç»™nalu_hdr->NRIã€‚
+        nalu_hdr->TYPE=n->nal_unit_type;
+
+        nalu_payload=&sendbuf[13];//åŒç†å°†sendbuf[13]èµ‹ç»™nalu_payload
+        memcpy(nalu_payload,n->buf+1,n->len-1);//å»æ‰naluå¤´çš„naluå‰©ä½™å†…å®¹å†™å…¥sendbuf[13]å¼€å§‹çš„å­—ç¬¦ä¸²ã€‚
+
+        rtp_hdr->timestamp=htonl(rtp_ts);
+        bytes=n->len + 12 ;						//è·å¾—sendbufçš„é•¿åº¦,ä¸ºnaluçš„é•¿åº¦ï¼ˆåŒ…å«NALUå¤´ä½†é™¤å»èµ·å§‹å‰ç¼€ï¼‰åŠ ä¸Šrtp_headerçš„å›ºå®šé•¿åº¦12å­—èŠ‚
+
+        isSucceed = doSend(sendbuf, bytes); //å‘é€
+    }
+    else if(n->len>1400)
+    {
+        ///å¾—åˆ°è¯¥naluéœ€è¦ç”¨å¤šå°‘é•¿åº¦ä¸º1400å­—èŠ‚çš„RTPåŒ…æ¥å‘é€
+        int packetNums = n->len/1400;//éœ€è¦kä¸ª1400å­—èŠ‚çš„RTPåŒ…
+        int lastPacketSize = n->len%1400;//æœ€åä¸€ä¸ªRTPåŒ…çš„éœ€è¦è£…è½½çš„å­—èŠ‚æ•°
+        if (lastPacketSize == 0)
+        {
+            lastPacketSize = 1400;
+        }
+        else
+        {
+            packetNums++;
+        }
+
+        int currentPacketIndex = 0; //å½“å‰å‘é€çš„åŒ…åºå·
+
+        rtp_hdr->timestamp=htonl(rtp_ts);
+
+        while(currentPacketIndex < packetNums)
+        {
+            rtp_hdr->seq_no = htons(seq_num ++); //åºåˆ—å·ï¼Œæ¯å‘é€ä¸€ä¸ªRTPåŒ…å¢1
+
+            if(currentPacketIndex == 0)//å‘é€ä¸€ä¸ªéœ€è¦åˆ†ç‰‡çš„NALUçš„ç¬¬ä¸€ä¸ªåˆ†ç‰‡ï¼Œç½®FU HEADERçš„Sä½
+            {
+                //è®¾ç½®rtp M ä½ï¼›
+                rtp_hdr->marker=0;
+                //è®¾ç½®FU INDICATOR,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[12]
+                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //å°†sendbuf[12]çš„åœ°å€èµ‹ç»™fu_indï¼Œä¹‹åå¯¹fu_indçš„å†™å…¥å°±å°†å†™å…¥sendbufä¸­ï¼›
+                fu_ind->F=n->forbidden_bit;
+                fu_ind->NRI=n->nal_reference_idc>>5;
+                fu_ind->TYPE=28;
+
+                //è®¾ç½®FU HEADER,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[13]
+                fu_hdr =(FU_HEADER*)&sendbuf[13];
+                fu_hdr->E=0;
+                fu_hdr->R=0;
+                fu_hdr->S=1;
+                fu_hdr->TYPE=n->nal_unit_type;
+
+                nalu_payload=&sendbuf[14];//åŒç†å°†sendbuf[14]èµ‹ç»™nalu_payload
+                memcpy(nalu_payload,n->buf+1,1400-1);//å»æ‰NALUå¤´
+
+                bytes=1400-1+14; //è·å¾—sendbufçš„é•¿åº¦,ä¸ºnaluçš„é•¿åº¦ï¼ˆé™¤å»èµ·å§‹å‰ç¼€å’ŒNALUå¤´ï¼‰åŠ ä¸Šrtp_headerï¼Œfu_indï¼Œfu_hdrçš„å›ºå®šé•¿åº¦14å­—èŠ‚
+
+                isSucceed = doSend(sendbuf, bytes); //å‘é€
+            }
+            //å‘é€ä¸€ä¸ªéœ€è¦åˆ†ç‰‡çš„NALUçš„éç¬¬ä¸€ä¸ªåˆ†ç‰‡ï¼Œæ¸…é›¶FU HEADERçš„Sä½ï¼Œå¦‚æœè¯¥åˆ†ç‰‡æ˜¯è¯¥NALUçš„æœ€åä¸€ä¸ªåˆ†ç‰‡ï¼Œç½®FU HEADERçš„Eä½
+            else if(currentPacketIndex==(packetNums-1))//å‘é€çš„æ˜¯æœ€åä¸€ä¸ªåˆ†ç‰‡ï¼Œæ³¨æ„æœ€åä¸€ä¸ªåˆ†ç‰‡çš„é•¿åº¦å¯èƒ½è¶…è¿‡1400å­—èŠ‚ï¼ˆå½“l>1386æ—¶ï¼‰ã€‚
+            {
+
+                //è®¾ç½®rtp M ä½ï¼›å½“å‰ä¼ è¾“çš„æ˜¯æœ€åä¸€ä¸ªåˆ†ç‰‡æ—¶è¯¥ä½ç½®1
+                rtp_hdr->marker=1;
+                //è®¾ç½®FU INDICATOR,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[12]
+                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //å°†sendbuf[12]çš„åœ°å€èµ‹ç»™fu_indï¼Œä¹‹åå¯¹fu_indçš„å†™å…¥å°±å°†å†™å…¥sendbufä¸­ï¼›
+                fu_ind->F=n->forbidden_bit;
+                fu_ind->NRI=n->nal_reference_idc>>5;
+                fu_ind->TYPE=28;
+
+                //è®¾ç½®FU HEADER,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[13]
+                fu_hdr =(FU_HEADER*)&sendbuf[13];
+                fu_hdr->R=0;
+                fu_hdr->S=0;
+                fu_hdr->TYPE=n->nal_unit_type;
+                fu_hdr->E=1;
+
+                nalu_payload=&sendbuf[14];//åŒç†å°†sendbuf[14]çš„åœ°å€èµ‹ç»™nalu_payload
+                memcpy(nalu_payload,n->buf+currentPacketIndex*1400,lastPacketSize);//å°†naluæœ€åå‰©ä½™çš„l-1(å»æ‰äº†ä¸€ä¸ªå­—èŠ‚çš„NALUå¤´)å­—èŠ‚å†…å®¹å†™å…¥sendbuf[14]å¼€å§‹çš„å­—ç¬¦ä¸²ã€‚
+                bytes=lastPacketSize+14;		//è·å¾—sendbufçš„é•¿åº¦,ä¸ºå‰©ä½™naluçš„é•¿åº¦l-1åŠ ä¸Šrtp_headerï¼ŒFU_INDICATOR,FU_HEADERä¸‰ä¸ªåŒ…å¤´å…±14å­—èŠ‚
+
+                isSucceed = doSend(sendbuf, bytes); //å‘é€
+
+                break; //æœ€åä¸€ä¸ªåˆ†ç‰‡çš„è¯ åˆ™é€€å‡ºå¾ªç¯ ä¸æ‰§è¡Œåé¢çš„sleep
+            }
+            else //if(t<k&&0!=t)
+            {
+                //è®¾ç½®rtp M ä½ï¼›
+                rtp_hdr->marker=0;
+                //è®¾ç½®FU INDICATOR,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[12]
+                fu_ind =(FU_INDICATOR*)&sendbuf[12]; //å°†sendbuf[12]çš„åœ°å€èµ‹ç»™fu_indï¼Œä¹‹åå¯¹fu_indçš„å†™å…¥å°±å°†å†™å…¥sendbufä¸­ï¼›
+                fu_ind->F=n->forbidden_bit;
+                fu_ind->NRI=n->nal_reference_idc>>5;
+                fu_ind->TYPE=28;
+
+                //è®¾ç½®FU HEADER,å¹¶å°†è¿™ä¸ªHEADERå¡«å…¥sendbuf[13]
+                fu_hdr =(FU_HEADER*)&sendbuf[13];
+                //fu_hdr->E=0;
+                fu_hdr->R=0;
+                fu_hdr->S=0;
+                fu_hdr->E=0;
+                fu_hdr->TYPE=n->nal_unit_type;
+
+                nalu_payload=&sendbuf[14];//åŒç†å°†sendbuf[14]çš„åœ°å€èµ‹ç»™nalu_payload
+                memcpy(nalu_payload,n->buf+currentPacketIndex*1400,1400);//å»æ‰èµ·å§‹å‰ç¼€çš„naluå‰©ä½™å†…å®¹å†™å…¥sendbuf[14]å¼€å§‹çš„å­—ç¬¦ä¸²ã€‚
+                bytes=1400+14;						//è·å¾—sendbufçš„é•¿åº¦,ä¸ºnaluçš„é•¿åº¦ï¼ˆé™¤å»åŸNALUå¤´ï¼‰åŠ ä¸Šrtp_headerï¼Œfu_indï¼Œfu_hdrçš„å›ºå®šé•¿åº¦14å­—èŠ‚
+
+                isSucceed = doSend(sendbuf, bytes); //å‘é€
+            }
+
+            currentPacketIndex++;
+
+            AppConfig::mSleep(2); //ä¼‘çœ 2Ms ä¸èƒ½å‘å¤ªå¿«äº†
+        }
+    }
+
+    FreeNALU(n); //é‡Šæ”¾NALUå†…å­˜
+
+    return isSucceed;
+}
+
+bool RtpConnection::sendG711ABuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    bool isSucceed = false;
+
+    uint32_t rtp_ts = (uint32_t)(timestamp * sample_rate / 1000000);
+    int pos = 0;
+
+    while(1)
+    {
+        uint8_t sendbuf[1500] = {0};
+
+        int sendLen = len - pos;
+
+        if (sendLen <= 0) break;
+
+        if (sendLen > 1400)
+        {
+            sendLen = 1400;
+        }
+
+    //rtpå›ºå®šåŒ…å¤´ï¼Œä¸º12å­—èŠ‚,è¯¥å¥å°†sendbuf[0]çš„åœ°å€èµ‹ç»™rtp_hdrï¼Œä»¥åå¯¹rtp_hdrçš„å†™å…¥æ“ä½œå°†ç›´æ¥å†™å…¥sendbufã€‚
+        RTP_FIXED_HEADER* rtp_hdr =(RTP_FIXED_HEADER*)sendbuf; //è®¾ç½®RTP HEADERï¼Œ
+        rtp_hdr->payload    = G711A;  //è´Ÿè½½ç±»å‹å·ï¼Œ
+        rtp_hdr->version    = 2;  //ç‰ˆæœ¬å·ï¼Œæ­¤ç‰ˆæœ¬å›ºå®šä¸º2
+        rtp_hdr->marker     = 0;   //æ ‡å¿—ä½ï¼Œç”±å…·ä½“åè®®è§„å®šå…¶å€¼ã€‚
+        rtp_hdr->ssrc       = htonl(ssrc);    //åœ¨æœ¬RTPä¼šè¯ä¸­å…¨å±€å”¯ä¸€
+        rtp_hdr->seq_no     = htons(seq_num ++); //åºåˆ—å·ï¼Œæ¯å‘é€ä¸€ä¸ªRTPåŒ…å¢1
+        rtp_hdr->timestamp  = htonl(rtp_ts);
+        //å°†è¦å‘é€çš„æ•°æ®å¡«å…¥sendbuf[12]
+        memcpy(&sendbuf[RTP_HEADER_SIZE], frame + pos, sendLen);
+        pos += sendLen;
+
+        isSucceed = doSend(sendbuf, sendLen + RTP_HEADER_SIZE);
+
+        if (!isSucceed) break;
+
+    }
+
+//    while (len > 0 && count < e->nbpkts)
+//    {
+//        struct rtphdr *hdr = NULL;
+//        int pktsiz = 0;
+//        packets[count] = e->szbuf + e->pktsiz * count;
+//        hdr = (struct rtphdr*)(packets[count]);
+//        pktsiz = e->pktsiz;
+//        hdr->v = 2;
+//        hdr->p = 0;
+//        hdr->x = 0;
+//        hdr->cc = 0;
+//        hdr->m = (e->seq == 0);
+//        hdr->pt = e->pt;
+//        hdr->seq = htons(e->seq++);
+//        hdr->ts  = htonl(rtp_ts);
+//        hdr->ssrc = htonl(e->ssrc);
+
+//        if (len <= pktsiz - RTPHDR_SIZE) {
+//            memcpy(packets[count] + RTPHDR_SIZE, frame, len);
+//            pktsizs[count] = RTPHDR_SIZE + len;
+//            frame += len;
+//            len -= len;
+//        } else {
+//            memcpy(packets[count] + RTPHDR_SIZE, frame, pktsiz - RTPHDR_SIZE);
+//            pktsizs[count] = pktsiz;
+//            frame += pktsiz - RTPHDR_SIZE;
+//            len -= pktsiz - RTPHDR_SIZE;
+//        }
+//        count ++;
+//    }
+
+    return isSucceed;
+}

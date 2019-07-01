@@ -14,7 +14,7 @@ void CommonThread::start()
 {
     mIsStop = false;
 
-    //启动新的线程
+    //鍚姩鏂扮殑绾跨▼
     std::thread([&](CommonThread *pointer)
     {
         pointer->run();

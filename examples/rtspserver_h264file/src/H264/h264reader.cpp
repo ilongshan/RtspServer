@@ -1,6 +1,6 @@
 /**
- * Ò¶º£»Ô
- * QQÈº121376426
+ * å¶æµ·è¾‰
+ * QQç¾¤121376426
  * http://blog.yundiantech.com/
  */
 
@@ -9,37 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-//ÎªNALU_t½á¹¹Ìå·ÖÅäÄÚ´æ¿Õ¼ä
-NALU_t *AllocNALU(int buffersize)
-{
-    NALU_t *n = NULL;
-
-    n = (NALU_t*)malloc (sizeof(NALU_t));
-    n->max_size = buffersize;	//Assign buffer size
-    n->buf = (unsigned char*)malloc (buffersize);
-    n->len = buffersize;
-
-    return n;
-}
-
-//ÊÍ·Å
-void FreeNALU(NALU_t *n)
-{
-  if (n)
-  {
-    if (n->buf)
-    {
-      free(n->buf);
-      n->buf=NULL;
-    }
-    free (n);
-  }
-}
-
-
 h264Reader::h264Reader()
 {
-    ///³õÊ¼»¯Ò»¶ÎÄÚ´æ ÓÃÓÚÁÙÊ±´æ·Åh264Êı¾İ
+    ///åˆå§‹åŒ–ä¸€æ®µå†…å­˜ ç”¨äºä¸´æ—¶å­˜æ”¾h264æ•°æ®
     mH264Buffer = (uint8_t*)malloc(1024*1024*10);
     mBufferSize = 0;
 }
@@ -52,30 +24,30 @@ int h264Reader::inputH264Data(uint8_t *buf, int len)
     return mBufferSize;
 }
 
-NALU_t* h264Reader::getNextFrame()
+NALU_t* h264Reader::getNextFrame(uint8_t *&h264Buf, int &h264BufSize)
 {
 
-    /*¸ù¾İh264ÎÄ¼şµÄÌØĞÔ  Öğ¸ö×Ö½ÚËÑË÷ Ö±µ½Óöµ½h264µÄÖ¡Í· ÊÓÎª»ñÈ¡µ½ÁËÍêÕûµÄÒ»Ö¡h264ÊÓÆµÊı¾İ*/
+    /*æ ¹æ®h264æ–‡ä»¶çš„ç‰¹æ€§  é€ä¸ªå­—èŠ‚æœç´¢ ç›´åˆ°é‡åˆ°h264çš„å¸§å¤´ è§†ä¸ºè·å–åˆ°äº†å®Œæ•´çš„ä¸€å¸§h264è§†é¢‘æ•°æ®*/
 
-///    ¹ØÓÚÆğÊ¼ÂëstartcodeµÄÁ½ÖÖĞÎÊ½£º3×Ö½ÚµÄ0x000001ºÍ4×Ö½ÚµÄ0x00000001
-///    3×Ö½ÚµÄ0x000001Ö»ÓĞÒ»ÖÖ³¡ºÏÏÂÊ¹ÓÃ£¬¾ÍÊÇÒ»¸öÍêÕûµÄÖ¡±»±àÎª¶à¸ösliceµÄÊ±ºò£¬
-///    °üº¬ÕâĞ©sliceµÄnaluÊ¹ÓÃ3×Ö½ÚÆğÊ¼Âë¡£ÆäÓà³¡ºÏ¶¼ÊÇ4×Ö½ÚµÄ¡£
+///    å…³äºèµ·å§‹ç startcodeçš„ä¸¤ç§å½¢å¼ï¼š3å­—èŠ‚çš„0x000001å’Œ4å­—èŠ‚çš„0x00000001
+///    3å­—èŠ‚çš„0x000001åªæœ‰ä¸€ç§åœºåˆä¸‹ä½¿ç”¨ï¼Œå°±æ˜¯ä¸€ä¸ªå®Œæ•´çš„å¸§è¢«ç¼–ä¸ºå¤šä¸ªsliceçš„æ—¶å€™ï¼Œ
+///    åŒ…å«è¿™äº›sliceçš„naluä½¿ç”¨3å­—èŠ‚èµ·å§‹ç ã€‚å…¶ä½™åœºåˆéƒ½æ˜¯4å­—èŠ‚çš„ã€‚
 
-    ///Ê×ÏÈ²éÕÒµÚÒ»¸öÆğÊ¼Âë
+    ///é¦–å…ˆæŸ¥æ‰¾ç¬¬ä¸€ä¸ªèµ·å§‹ç 
 
-    int pos = 0; //¼ÇÂ¼µ±Ç°´¦ÀíµÄÊı¾İÆ«ÒÆÁ¿
+    int pos = 0; //è®°å½•å½“å‰å¤„ç†çš„æ•°æ®åç§»é‡
     int StartCode = 0;
 
     while(1)
     {
         unsigned char* Buf = mH264Buffer + pos;
-        int lenth = mBufferSize - pos; //Ê£ÓàÃ»ÓĞ´¦ÀíµÄÊı¾İ³¤¶È
+        int lenth = mBufferSize - pos; //å‰©ä½™æ²¡æœ‰å¤„ç†çš„æ•°æ®é•¿åº¦
         if (lenth <= 4)
         {
             return NULL;
         }
 
-        ///²éÕÒÆğÊ¼Âë(0x00000001)
+        ///æŸ¥æ‰¾èµ·å§‹ç (0x00000001)
 
         if(Buf[0]==0 && Buf[1]==0 && Buf[2] ==0 && Buf[3] ==1)
          //Check whether buf is 0x00000001
@@ -85,27 +57,27 @@ NALU_t* h264Reader::getNextFrame()
         }
         else
         {
-            //·ñÔò Íùºó²éÕÒÒ»¸ö×Ö½Ú
+            //å¦åˆ™ å¾€åæŸ¥æ‰¾ä¸€ä¸ªå­—èŠ‚
             pos++;
         }
     }
 
 
-    ///È»ºó²éÕÒÏÂÒ»¸öÆğÊ¼Âë²éÕÒµÚÒ»¸öÆğÊ¼Âë
+    ///ç„¶åæŸ¥æ‰¾ä¸‹ä¸€ä¸ªèµ·å§‹ç æŸ¥æ‰¾ç¬¬ä¸€ä¸ªèµ·å§‹ç 
 
-    int pos_2 = pos + StartCode; //¼ÇÂ¼µ±Ç°´¦ÀíµÄÊı¾İÆ«ÒÆÁ¿
+    int pos_2 = pos + StartCode; //è®°å½•å½“å‰å¤„ç†çš„æ•°æ®åç§»é‡
     int StartCode_2 = 0;
 
     while(1)
     {
         unsigned char* Buf = mH264Buffer + pos_2;
-        int lenth = mBufferSize - pos_2; //Ê£ÓàÃ»ÓĞ´¦ÀíµÄÊı¾İ³¤¶È
+        int lenth = mBufferSize - pos_2; //å‰©ä½™æ²¡æœ‰å¤„ç†çš„æ•°æ®é•¿åº¦
         if (lenth <= 4)
         {
             return NULL;
         }
 
-        ///²éÕÒÆğÊ¼Âë(0x00000001)
+        ///æŸ¥æ‰¾èµ·å§‹ç (0x00000001)
 
         if(Buf[0]==0 && Buf[1]==0 && Buf[2] ==0 && Buf[3] ==1)
          //Check whether buf is 0x00000001
@@ -115,21 +87,26 @@ NALU_t* h264Reader::getNextFrame()
         }
         else
         {
-            //·ñÔò Íùºó²éÕÒÒ»¸ö×Ö½Ú
+            //å¦åˆ™ å¾€åæŸ¥æ‰¾ä¸€ä¸ªå­—èŠ‚
             pos_2++;
         }
     }
 
-    /// ÏÖÔÚ posºÍpos_2Ö®¼äµÄÊı¾İ¾ÍÊÇÒ»Ö¡Êı¾İÁË
-    /// °ÑËûÈ¡³öÀ´
+    /// ç°åœ¨ poså’Œpos_2ä¹‹é—´çš„æ•°æ®å°±æ˜¯ä¸€å¸§æ•°æ®äº†
+    /// æŠŠä»–å–å‡ºæ¥
 
-    ///×¢Òâ£ºÕâÀïµÄÊı¾İÈ¥µôÁËÆğÊ¼Âë
-    unsigned char* Buf = mH264Buffer + pos + StartCode; //ÕâÖ¡Êı¾İµÄÆğÊ¼Êı¾İ(²»°üº¬ÆğÊ¼Âë)
-    int naluSize = pos_2 - pos - StartCode; //naluÊı¾İ´óĞ¡ ²»°üº¬ÆğÊ¼Âë
+    ///æ³¨æ„ï¼šè¿™é‡Œçš„æ•°æ®å»æ‰äº†èµ·å§‹ç 
+    unsigned char* Buf = mH264Buffer + pos + StartCode; //è¿™å¸§æ•°æ®çš„èµ·å§‹æ•°æ®(ä¸åŒ…å«èµ·å§‹ç )
+    int naluSize = pos_2 - pos - StartCode; //naluæ•°æ®å¤§å° ä¸åŒ…å«èµ·å§‹ç 
+
+    h264BufSize = pos_2 - pos;
+    h264Buf = (uint8_t*)malloc(h264BufSize);
+    memcpy(h264Buf, mH264Buffer + pos, h264BufSize);
+
 
 //    NALU_HEADER *nalu_header = (NALU_HEADER *)Buf;
 
-    NALU_t * nalu = AllocNALU(naluSize);//·ÖÅänal ×ÊÔ´
+    NALU_t * nalu = AllocNALU(naluSize);//åˆ†é…nal èµ„æº
 
     nalu->startcodeprefix_len = StartCode;      //! 4 for parameter sets and first slice in picture, 3 for everything else (suggested)
     nalu->len = naluSize;                 //! Length of the NAL unit (Excluding the start code, which does not belong to the NALU)
@@ -146,8 +123,8 @@ NALU_t* h264Reader::getNextFrame()
     nalu->nal_unit_type = (nalu->buf[0]) & 0x1f;// 5 bit
 
 
-    /// ½«ÕâÒ»Ö¡Êı¾İÈ¥µô
-    /// °ÑºóÒ»Ö¡Êı¾İ¸²¸ÇÉÏÀ´
+    /// å°†è¿™ä¸€å¸§æ•°æ®å»æ‰
+    /// æŠŠåä¸€å¸§æ•°æ®è¦†ç›–ä¸Šæ¥
     int leftSize = mBufferSize - pos_2;
     memcpy(mH264Buffer, mH264Buffer + pos_2, leftSize);
     mBufferSize = leftSize;

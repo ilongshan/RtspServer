@@ -1,6 +1,7 @@
 #ifndef RTSPCLIENT_H
 #define RTSPCLIENT_H
 
+#include "Mutex/Cond.h"
 #include "RtspMsg.h"
 #include "RTP/RtpConnection.h"
 
@@ -8,7 +9,7 @@ class RtspSession;
 
 /**
  * @brief The RtspClient class
- * Ò»¸öÁ¬½Ó½øÀ´µÄRTSP ¿Í»§¶Ë
+ * ä¸€ä¸ªè¿æ¥è¿›æ¥çš„RTSP å®¢æˆ·ç«¯
  */
 class RtspClient
 {
@@ -19,12 +20,14 @@ public:
     void setSocketFd(int fd){mSocketFd = fd;}
     int getSocketFd(){return mSocketFd;}
 
-    ///´¦ÀíÊÕµ½µÄÏûÏ¢
+    ///å¤„ç†æ”¶åˆ°çš„æ¶ˆæ¯
     int dealwithReceiveBuffer(const char *buffer, const int &bufferLen);
 
     RtspSession *getRtspSession(){return mRtspSession;}
 
-    void sendAnNalu(NALU_t *n, int framerate);
+    void sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
+
+    bool sendG711A(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
 
 private:
     int mSocketFd;  //rtsp client socket
@@ -32,7 +35,7 @@ private:
     char mMsgBuffer[4096];
     int mMsgLen;
 
-    RtspSession *mRtspSession; //¼ÇÂ¼±¾¿Í»§¶ËËùÊôµÄRTSP»á»°
+    RtspSession *mRtspSession; //è®°å½•æœ¬å®¢æˆ·ç«¯æ‰€å±çš„RTSPä¼šè¯
 
     int processRequest(const rtsp_msg_s *requestMsg, rtsp_msg_s *responseMsg);
 
@@ -49,8 +52,9 @@ public:
 
     RtpConnection *vrtp;
     RtpConnection *artp;
+    Cond *mCond_RtpSocket; //ç”¨äºç»™éŸ³è§†é¢‘çš„RTP socketåŠ é”ï¼Œé˜²æ­¢å‘é€éŸ³é¢‘å’Œè§†é¢‘çš„æ—¶å€™ åŒæ—¶ä½¿ç”¨äº†rtpçš„socket
 
-    ///´¦Àí¿Í»§¶Ë·¢¹ıÀ´µÄÃüÁî
+    ///å¤„ç†å®¢æˆ·ç«¯å‘è¿‡æ¥çš„å‘½ä»¤
     int rtspHandleOPTIONS(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg);
     int rtspHandleDESCRIBE(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg);
     int rtspHandleSETUP(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg);
@@ -58,10 +62,10 @@ public:
     int rtspHandlePLAY(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg);
     int rtspHandleTEARDOWN(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg);
 
-    ///´´½¨ĞÂµÄRTPÁ¬½Ó
+    ///åˆ›å»ºæ–°çš„RTPè¿æ¥
     int rtspNewRtpConnection(const char *peer_ip, int peer_port_interleaved, int isaudio, int istcp);
 
-    ///É¾³ıRTPÁ¬½Ó
+    ///åˆ é™¤RTPè¿æ¥
     void rtspDelRtpConnection(int isaudio);
 
 };

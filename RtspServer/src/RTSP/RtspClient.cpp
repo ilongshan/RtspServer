@@ -34,18 +34,43 @@ RtspClient::RtspClient()
 
     memset(mMsgBuffer, 0x0, 4096);
     mMsgLen = 0;
+
+    mCond_RtpSocket = new Cond;
+
 }
 
 RtspClient::~RtspClient()
 {
     rtspDelRtpConnection(0);
     rtspDelRtpConnection(1);
+
+    delete mCond_RtpSocket;
+    mCond_RtpSocket = nullptr;
 }
 
-void RtspClient::sendAnNalu(NALU_t *n, int framerate)
+void RtspClient::sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
 {
+    mCond_RtpSocket->Lock();
+
     if (vrtp != nullptr)
-        vrtp->sendAnNalu(n, framerate);
+        vrtp->sendH264Buffer(frame, len, timestamp, sample_rate);
+
+    mCond_RtpSocket->Unlock();
+
+}
+
+bool RtspClient::sendG711A(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    bool isSucceed = false;
+
+    mCond_RtpSocket->Lock();
+
+    if (artp != nullptr)
+        isSucceed = artp->sendG711ABuffer(frame, len, timestamp, sample_rate);
+
+    mCond_RtpSocket->Unlock();
+
+    return isSucceed;
 }
 
 int RtspClient::dealwithReceiveBuffer(const char *buffer, const int &bufferLen)
@@ -108,7 +133,7 @@ int RtspClient::processRequest(const rtsp_msg_s *requestMsg, rtsp_msg_s *respons
     rtsp_msg_set_response(responseMsg, 200);
 
     if (mRtspSession == nullptr)
-    { ///当前客户端还没有绑定到所属的会话
+    { ///褰撳墠瀹㈡埛绔繕娌℃湁缁戝畾鍒版墍灞炵殑浼氳瘽
         bool isPathExist = false;
         for (const RtspSession * rtspSession : AppConfig::gRtspServer->getRtspSessonList())
         {
@@ -116,7 +141,7 @@ int RtspClient::processRequest(const rtsp_msg_s *requestMsg, rtsp_msg_s *respons
 
             if (0 == strncmp(path, sessionPath.c_str(), sessionPath.size()))
             { //XXX rtsp://127.0.0.1/live/chn0000 rtsp://127.0.0.1/live/chn0
-                ((RtspSession*)rtspSession)->inputRtspClient(this);
+                ((RtspSession*)rtspSession)->addRtspClient(this);
                 this->mRtspSession = (RtspSession*)rtspSession;
                 isPathExist = true;
                 break;
@@ -257,12 +282,12 @@ void RtspClient::rtspDelRtpConnection(int isaudio)
     if (isaudio)
     {
         rtp = this->artp;
-        this->artp = NULL;
+        this->artp = nullptr;
     }
     else
     {
         rtp = this->vrtp;
-        this->vrtp = NULL;
+        this->vrtp = nullptr;
     }
 
     if (rtp)
@@ -294,7 +319,7 @@ int RtspClient::rtspHandleDESCRIBE(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg)
 {
     RtspSession *s = this->getRtspSession();
 
-    char sdp[512] = "";
+    char sdp[2048] = {0};
     int len = 0;
     uint32_t accept = 0;
     const rtsp_msg_uri_s *puri = &reqmsg->hdrs.startline.reqline.uri;

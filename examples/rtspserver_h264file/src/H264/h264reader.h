@@ -1,6 +1,6 @@
 /**
- * Ò¶º£»Ô
- * QQÈº121376426
+ * å¶æµ·è¾‰
+ * QQç¾¤121376426
  * http://blog.yundiantech.com/
  */
 
@@ -12,9 +12,9 @@
 
 #include "H264/h264.h"
 
-//ÎªNALU_t½á¹¹Ìå·ÖÅäÄÚ´æ¿Õ¼ä
+//ä¸ºNALU_tç»“æ„ä½“åˆ†é…å†…å­˜ç©ºé—´
 NALU_t *AllocNALU(int buffersize);
-//ÊÍ·Å
+//é‡Šæ”¾
 void FreeNALU(NALU_t *n);
 
 class h264Reader
@@ -22,10 +22,10 @@ class h264Reader
 public:
     h264Reader();
 
-    int inputH264Data(uint8_t *buf,int len); //ÊäÈëh264Êı¾İ
+    int inputH264Data(uint8_t *buf,int len); //è¾“å…¥h264æ•°æ®
 
-    ///´ÓH264Êı¾İÖĞ²éÕÒ³öÒ»Ö¡Êı¾İ
-    NALU_t* getNextFrame();
+    ///ä»H264æ•°æ®ä¸­æŸ¥æ‰¾å‡ºä¸€å¸§æ•°æ®
+    NALU_t* getNextFrame(uint8_t * & h264Buf, int & h264BufSize);
 
 private:
     uint8_t *mH264Buffer;

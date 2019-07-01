@@ -3,87 +3,92 @@
 #include "RtspClient.h"
 #include "Log/log.h"
 
-RtspSession::RtspSession()
+RtspSession::RtspSession(bool isHasVideo, bool isHasAudio)
 {
-    mCond = new Cond;
+    mCond_RtspClient = new Cond;
 
-    this->has_video = true;
-    this->has_audio = true;
+    this->has_video = isHasVideo;
+    this->has_audio = isHasAudio;
 
     h264_sps_len = 0;
     h264_pps_len = 0;
-
-//#define RTP_MAX_PKTSIZ	((1500-42)/4*4)
-//#define RTP_MAX_NBPKTS	(300)
-//    if (this->has_video) {
-//        this->vrtpe.ssrc = 0;
-//        this->vrtpe.seq = 0;
-//        this->vrtpe.pt = 96;
-//        this->vrtpe.sample_rate = 90000;
-//        rtp_enc_init(&s->vrtpe, RTP_MAX_PKTSIZ, RTP_MAX_NBPKTS);
-//    }
-//    if (this>has_audio) {
-//        this>artpe.ssrc = 0;
-//        this>artpe.seq = 0;
-//        this>artpe.pt = 97;
-//        this>artpe.sample_rate = 8000;
-//        rtp_enc_init(&s->artpe, RTP_MAX_PKTSIZ, 5);
-//    }
 }
 
-void RtspSession::sendAnNalu(NALU_t *n, int framerate)
+bool RtspSession::sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
 {
-    rtsp_try_set_sps_pps(n);
+    rtsp_try_set_sps_pps(frame, len);
 
-    mCond->Lock();
+    mCond_RtspClient->Lock();
     for (RtspClient* rtspClient : mRtspClientList)
     {
-        rtspClient->sendAnNalu(n, framerate);
+        rtspClient->sendH264Buffer(frame, len, timestamp, sample_rate);
     }
-    mCond->Unlock();
+    mCond_RtspClient->Unlock();
+
+    return true;
 }
 
-void RtspSession::inputRtspClient(RtspClient* client)
+bool RtspSession::sendG711A(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
 {
-    mCond->Lock();
+    mCond_RtspClient->Lock();
+    for (RtspClient* rtspClient : mRtspClientList)
+    {
+        rtspClient->sendG711A(frame, len, timestamp, sample_rate);
+    }
+    mCond_RtspClient->Unlock();
+
+    return true;
+}
+
+void RtspSession::addRtspClient(RtspClient* client)
+{
+    mCond_RtspClient->Lock();
     mRtspClientList.push_back(client);
-    mCond->Unlock();
+    mCond_RtspClient->Unlock();
 }
 
 void RtspSession::removeRtspClient(RtspClient* client)
 {
-    mCond->Lock();
+    mCond_RtspClient->Lock();
     if (std::find(mRtspClientList.begin(), mRtspClientList.end(), client) != mRtspClientList.end())
     {
         mRtspClientList.remove(client);
     }
-    mCond->Unlock();
+    mCond_RtspClient->Unlock();
 }
 
-int RtspSession::rtsp_try_set_sps_pps (NALU_t *n)
+int RtspSession::rtsp_try_set_sps_pps (const uint8_t *h264Buf, int h264BufSize)
 {
     uint8_t type = 0;
-
-    int len = n->len;
 
     if (h264_sps_len > 0 && h264_pps_len > 0)
     {
         return 0;
     }
 
-    type = n->buf[0] & 0x1f;
-    len -= n->forbidden_bit;
+    int StartCode = 0;
 
-//    if (frame[0] == 0 && frame[1] == 0 && frame[2] == 1) {
-//        type = frame[3] & 0x1f;
-//        frame += 3;
-//        len   -= 3;
-//    }
-//    if (frame[0] == 0 && frame[1] == 0 && frame[2] == 0 && frame[3] == 1) {
-//        type = frame[4] & 0x1f;
-//        frame += 4;
-//        len   -= 4;
-//    }
+    uint8_t *Buf = (uint8_t *)h264Buf;
+
+    if(Buf[0]==0 && Buf[1]==0 && Buf[2] ==0 && Buf[3] ==1)
+     //Check whether buf is 0x00000001
+    {
+        StartCode = 4;
+    }
+    else if(Buf[0]==0 && Buf[1]==0 && Buf[2] ==1)
+    { //Check whether buf is 0x000001
+        StartCode = 3;
+    }
+    else
+    {
+        //否则 往后查找一个字节
+        return 0;
+    }
+
+    Buf += StartCode;
+
+    type = Buf[0] & 0x1f;
+    int len = h264BufSize - StartCode;
 
     if (len < 1)
         return -1;
@@ -93,7 +98,7 @@ int RtspSession::rtsp_try_set_sps_pps (NALU_t *n)
         RTSP_LogPrintf("sps %d\n", len);
         if (len > sizeof(h264_sps))
             len = sizeof(h264_sps);
-        memcpy(h264_sps, n->buf, len);
+        memcpy(h264_sps, Buf, len);
         h264_sps_len = len;
     }
 
@@ -102,7 +107,7 @@ int RtspSession::rtsp_try_set_sps_pps (NALU_t *n)
         RTSP_LogPrintf("pps %d\n", len);
         if (len > sizeof(h264_pps))
             len = sizeof(h264_pps);
-        memcpy(h264_pps, n->buf, len);
+        memcpy(h264_pps, Buf, len);
         h264_pps_len = len;
     }
 

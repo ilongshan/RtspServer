@@ -15,20 +15,20 @@ public:
     RtspServer();
 
     /**
-     * @brief startServer Æô¶¯¼àÌırtsp·şÎñÆ÷
-     * @param port  [in] rtsp¼àÌı¶Ë¿Ú
-     * @return ÊÇ·ñÆô¶¯³É¹¦
+     * @brief startServer å¯åŠ¨ç›‘å¬rtspæœåŠ¡å™¨
+     * @param port  [in] rtspç›‘å¬ç«¯å£
+     * @return æ˜¯å¦å¯åŠ¨æˆåŠŸ
      */
     bool startServer(int port = 554);
 
     /**
-     * @brief newSession ĞÂ½¨Ò»¸öRTSP»á»°
-     * @param name [in] »á»°Ãû³Æ Èç£º"/live/chn1"  ÄÇÃ´·ÃÎÊµÄµØÖ·¾ÍÊÇ:rtsp://xxxx:554/live/chn1
+     * @brief newSession æ–°å»ºä¸€ä¸ªRTSPä¼šè¯
+     * @param name [in] ä¼šè¯åç§° å¦‚ï¼š"/live/chn1"  é‚£ä¹ˆè®¿é—®çš„åœ°å€å°±æ˜¯:rtsp://xxxx:554/live/chn1
      * @return
      */
-    RtspSession *newSession(std::string name);
+    RtspSession *newSession(std::string name, bool isHasVideo, bool isHasAudio);
 
-    ///»ñÈ¡Rtsp»á»°ÁĞ±í
+    ///è·å–Rtspä¼šè¯åˆ—è¡¨
     std::list<RtspSession*> getRtspSessonList(){return mRtspSessionList;}
 
 protected:
@@ -37,13 +37,13 @@ protected:
     void threadFunc();
 
 private:
-    int mSockFd; //tcp·şÎñÆ÷fd
+    int mSockFd; //tcpæœåŠ¡å™¨fd
 
     struct sockaddr_in localaddr;
     struct sockaddr_in remoteaddr;
 
-    std::list<RtspSession*> mRtspSessionList; //Rtsp»á»°ÁĞ±í
-    std::list<RtspClient*> mRtspClientList; //Á¬½Ó½øÀ´µÄ¿Í»§¶ËÁĞ±í
+    std::list<RtspSession*> mRtspSessionList; //Rtspä¼šè¯åˆ—è¡¨
+    std::list<RtspClient*> mRtspClientList; //è¿æ¥è¿›æ¥çš„å®¢æˆ·ç«¯åˆ—è¡¨
 
 };
 

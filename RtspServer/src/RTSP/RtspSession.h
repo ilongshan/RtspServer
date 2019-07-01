@@ -13,28 +13,31 @@ class RtspClient;
 
 /**
  * @brief The RtspSession class
- * Ò»¸öRTSP»á»°£¬Ò²¾ÍÊÇÒ»¸öRTSPÁ÷
+ * ä¸€ä¸ªRTSPä¼šè¯ï¼Œä¹Ÿå°±æ˜¯ä¸€ä¸ªRTSPæµ
  */
 class RtspSession
 {
 public:
-    RtspSession();
+    RtspSession(bool isHasVideo, bool isHasAudio);
 
     void setSessionPath(std::string path){mSessionPath = path;}
     std::string getSessionPath(){return mSessionPath;}
 
-    void inputRtspClient(RtspClient* client);
+    void addRtspClient(RtspClient* client);
     void removeRtspClient(RtspClient* client);
 
-    void sendAnNalu(NALU_t *n, int framerate);
+    bool sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
+
+    bool sendG711A(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
 
 private:
-    std::string mSessionPath; //»á»°Â·¾¶
+    std::string mSessionPath; //ä¼šè¯è·¯å¾„
 
-    Cond *mCond;
-    std::list<RtspClient*> mRtspClientList; //¼ÇÂ¼Á¬½Óµ½±¾»á»°µÄRTSP¿Í»§¶Ë
+    Cond *mCond_RtspClient;
+    std::list<RtspClient*> mRtspClientList; //è®°å½•è¿æ¥åˆ°æœ¬ä¼šè¯çš„RTSPå®¢æˆ·ç«¯
 
 public:
+    ///éŸ³è§†é¢‘æ•°æ®ç›¸å…³ä¿¡æ¯
     int  has_video;
     int  has_audio;
     uint8_t h264_sps[64];
@@ -42,7 +45,7 @@ public:
     int     h264_sps_len;
     int     h264_pps_len;
 
-    int rtsp_try_set_sps_pps (NALU_t *n);
+    int rtsp_try_set_sps_pps (const uint8_t *h264Buf, int h264BufSize);
 
 };
 

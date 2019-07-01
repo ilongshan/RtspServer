@@ -7,42 +7,38 @@
 #include "H264/h264reader.h"
 #include "H264/h264decoder.h"
 
-//Êä³öNALU³¤¶ÈºÍTYPE
+#include <thread>
+
+uint64_t startTime = AppConfig::getTimeStamp_MilliSecond();
+
+//è¾“å‡ºNALUé•¿åº¦å’ŒTYPE
 void dump(NALU_t *n)
 {
     if (!n)return;
 
     RTSP_LogPrintf(" len: %d nal_unit_type: %x\n", n->len, n->nal_unit_type);
 }
-
-int main()
+ 
+void readH264File(RtspSession * rtspSession)
 {
-    printf("Hello World!\n");
-
-    RtspServer *mRtspServer = new RtspServer();
-    mRtspServer->startServer();
-
-    AppConfig::gRtspServer = mRtspServer;
-
-    RtspSession * rtspSession = mRtspServer->newSession("/live/chn1");
-
-    FILE *fp = fopen("../test.h264", "rb");
+    FILE *fp = fopen("../BarbieGirl.h264", "rb");
     if (fp == NULL)
     {
         RTSP_LogPrintf("H264 file not exist!");
         exit(-1);
     }
 
-    int frameNum = 0; //µ±Ç°²¥·ÅµÄÖ¡ĞòºÅ
-    int frameRate = 0; //Ö¡ÂÊ
+    int frameNum = 0; //å½“å‰æ’­æ”¾çš„å¸§åºå·
+    int frameRate = 0; //å¸§ç‡
+
+    uint64_t ts = 0;
 
     h264Reader *mH264Reader = new h264Reader();
-    uint64_t startTime = AppConfig::getTimeStamp_MilliSecond();
 
     while(1)
     {
-        char buf[10240];
-        int size = fread(buf, 1, 1024, fp);//´Óh264ÎÄ¼ş¶Á1024¸ö×Ö½Ú (Ä£Äâ´ÓÍøÂçÊÕµ½h264Á÷)
+        char buf[10240] = {0};
+        int size = fread(buf, 1, 1024, fp);//ä»h264æ–‡ä»¶è¯»1024ä¸ªå­—èŠ‚ (æ¨¡æ‹Ÿä»ç½‘ç»œæ”¶åˆ°h264æµ)
 
         if (size <= 0) fseek(fp, 0, SEEK_SET);
 
@@ -50,31 +46,14 @@ int main()
 
         while(1)
         {
-            //´ÓÇ°Ãæ¶Áµ½µÄÊı¾İÖĞ»ñÈ¡Ò»¸önalu
-            NALU_t* nalu = mH264Reader->getNextFrame();
+            uint8_t *h264Buf = nullptr;
+            int h264BufSize = 0;
+
+            //ä»å‰é¢è¯»åˆ°çš„æ•°æ®ä¸­è·å–ä¸€ä¸ªnalu
+            NALU_t* nalu = mH264Reader->getNextFrame(h264Buf, h264BufSize);
             if (nalu == NULL) break;
 
 //            dump(nalu);
-
-            ///Õâ¶ÁÈ¡µ½µÄnaluÒÑ¾­ÌŞ³ıÆğÊ¼ÂëÁË
-            ///¶ø´«¸øffmpeg½âÂëµÄÊı¾İĞèÒª´øÉÏÆğÊ¼Âë
-            ///Òò´ËĞèÒª¸øËû¼ÓÒ»¸öÉÏÈ¥
-            int h264BufferSize = nalu->len + nalu->startcodeprefix_len;
-            unsigned char * h264Buffer = (unsigned char *)malloc(h264BufferSize);
-
-            if (nalu->startcodeprefix_len == 4)
-            {
-                h264Buffer[0] = 0x00;
-                h264Buffer[1] = 0x00;
-                h264Buffer[2] = 0x00;
-                h264Buffer[3] = 0x01;
-            }
-            else
-            {
-                h264Buffer[0] = 0x00;
-                h264Buffer[1] = 0x00;
-                h264Buffer[2] = 0x01;
-            }
 
             if (frameRate <= 0)
             {
@@ -86,7 +65,7 @@ int main()
                 len -= nalu->forbidden_bit;
 
                 if (len < 1)
-                    return -1;
+                    return;
 
                 if (type == 7)
                 {
@@ -101,11 +80,12 @@ int main()
                     int height = 0;
                     int fps    = 0;
 
+                    ///è§£æSPSä¿¡æ¯ï¼Œä»ä¸­è·å–è§†é¢‘å®½é«˜å’Œå¸§ç‡
                     bool ret = h264Decoder::decodeSps(h264_sps, h264_sps_len, width, height, fps);
 
                     RTSP_LogPrintf("ret = %d width = %d height = %d fps = %d\n", ret, width, height, fps);
 
-                    if (fps <= 0) //½âÂëºóÖ¡ÂÊÎª0 ËµÃ÷spsÖĞ²»´øÖ¡ÂÊĞÅÏ¢ ÕâÀï¸øËûÉèÖÃ³É25
+                    if (fps <= 0) //è§£æåå¸§ç‡ä¸º0 è¯´æ˜spsä¸­ä¸å¸¦å¸§ç‡ä¿¡æ¯ è¿™é‡Œç»™ä»–è®¾ç½®æˆ25
                     {
                         fps = 25;
                     }
@@ -122,11 +102,13 @@ int main()
 
             frameNum++;
 
-            rtspSession->sendAnNalu(nalu, frameRate); //·¢ËÍrtp
+#define AUDIO_SAMPLE_RATE 90000
 
-            /// h264ÂãÊı¾İ²»°üº¬Ê±¼ä´ÁĞÅÏ¢  Òò´ËÖ»ÄÜ¸ù¾İÖ¡ÂÊ×öÍ¬²½
-            /// ĞèÒª³É¹¦½âÂëÒ»Ö¡ºó ²ÅÄÜ»ñÈ¡µ½Ö¡ÂÊ
-            /// Îª0ËµÃ÷»¹Ã»»ñÈ¡µ½ ÔòÖ±½ÓÏÔÊ¾
+            rtspSession->sendH264Buffer(h264Buf, h264BufSize, ts, AUDIO_SAMPLE_RATE);
+
+            /// h264è£¸æ•°æ®ä¸åŒ…å«æ—¶é—´æˆ³ä¿¡æ¯  å› æ­¤åªèƒ½æ ¹æ®å¸§ç‡åšåŒæ­¥
+            /// éœ€è¦æˆåŠŸè§£ç ä¸€å¸§å æ‰èƒ½è·å–åˆ°å¸§ç‡
+            /// ä¸º0è¯´æ˜è¿˜æ²¡è·å–åˆ° åˆ™ç›´æ¥æ˜¾ç¤º
             uint64_t currentTime = AppConfig::getTimeStamp_MilliSecond();
             if (frameRate != 0)
             {
@@ -136,10 +118,76 @@ int main()
                     Sleep(sleepTime);
             }
 
-            FreeNALU(nalu); //ÊÍ·ÅNALUÄÚ´æ
+            ts = (currentTime - startTime) * 1000; //å¾®ç§’
 
+            FreeNALU(nalu); //é‡Šæ”¾NALUå†…å­˜
+
+            free(h264Buf);
         }
     }
+}
+
+void readG711AFile(RtspSession * rtspSession)
+{
+    FILE *fp = fopen("../BarbieGirl.alaw", "rb");
+    if (fp == NULL)
+    {
+        RTSP_LogPrintf("G711A file not exist!");
+        exit(-1);
+    }
+
+    uint64_t ts = 0;
+
+
+#define AUDIO_FRAME_SIZE 320
+#define AUDIO_SAMPLE_RATE 8000
+
+    while(1)
+    {
+        char buf[10240] = {0};
+        int size = fread(buf, 1, AUDIO_FRAME_SIZE, fp);//ä»h264æ–‡ä»¶è¯»1024ä¸ªå­—èŠ‚ (æ¨¡æ‹Ÿä»ç½‘ç»œæ”¶åˆ°h264æµ)
+
+        if (size <= 0) fseek(fp, 0, SEEK_SET);
+
+        uint64_t currentTime = AppConfig::getTimeStamp_MilliSecond();
+
+        ts = (currentTime - startTime) * 1000;
+
+        Sleep(1000 / 25);
+
+        rtspSession->sendG711A((uint8_t*)buf, AUDIO_FRAME_SIZE, ts, AUDIO_SAMPLE_RATE);
+
+    }
+}
+
+int main()
+{
+    printf("Hello World!\n");
+
+    RtspServer *mRtspServer = new RtspServer();
+    mRtspServer->startServer();
+
+    AppConfig::gRtspServer = mRtspServer;
+
+    RtspSession * rtspSession = mRtspServer->newSession("/live/chn1", false, true);
+
+    startTime = AppConfig::getTimeStamp_MilliSecond();
+
+    //å¯åŠ¨æ–°çš„çº¿ç¨‹è¯»å–è§†é¢‘æ–‡ä»¶
+    std::thread([&](RtspSession * rtspSession)
+    {
+        readH264File(rtspSession);
+
+    }, rtspSession).detach();
+
+    //å¯åŠ¨æ–°çš„çº¿ç¨‹è¯»å–éŸ³é¢‘æ–‡ä»¶
+    std::thread([&](RtspSession * rtspSession)
+    {
+        readG711AFile(rtspSession);
+
+    }, rtspSession).detach();
+
+    while(1) Sleep(1000);
 
     return 0;
 }

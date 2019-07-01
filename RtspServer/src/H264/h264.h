@@ -1,13 +1,15 @@
 /**
- * Ҷ����
- * QQȺ121376426
+ * 叶海辉
+ * QQ群121376426
  * http://blog.yundiantech.com/
  */
 
 #ifndef H264_H
 #define H264_H
 
+#include <stdint.h>
 #include <stdlib.h>
+#include <string>
 
 typedef struct
 {
@@ -29,6 +31,19 @@ typedef struct {
     unsigned char F:1;
 
 } NALU_HEADER; /**//* 1 BYTES */
+
+//为NALU_t结构体分配内存空间
+NALU_t *AllocNALU(int buffersize);
+
+//释放
+void FreeNALU(NALU_t *n);
+
+/**
+ * @brief getNALU 从H264数据中获取一个NALU_t结构体数据
+ * @param h264Buf 传入的数据必须是包含起始码的 且只能是完整的一帧数据
+ * @return
+ */
+NALU_t *getNALU(const uint8_t *h264Buf, int len);
 
 
 #endif // H264_H

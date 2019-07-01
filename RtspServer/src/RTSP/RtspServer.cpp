@@ -11,9 +11,9 @@ RtspServer::RtspServer()
 
 }
 
-RtspSession * RtspServer::newSession(std::string name)
+RtspSession * RtspServer::newSession(std::string name, bool isHasVideo, bool isHasAudio)
 {
-    RtspSession *mRtspSession = new RtspSession;
+    RtspSession *mRtspSession = new RtspSession(isHasVideo, isHasAudio);
     mRtspSession->setSessionPath(name);
     mRtspSessionList.push_back(mRtspSession);
     return mRtspSession;
@@ -36,7 +36,7 @@ bool RtspServer::startServer(int port)
         return false;
     }
 
-    // °ó¶¨µØÖ·ºÍ¶Ë¿Ú
+    // ç»‘å®šåœ°å€å’Œç«¯å£
     memset(&localaddr, 0, sizeof(localaddr));
     localaddr.sin_family = AF_INET;
     localaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -50,8 +50,8 @@ bool RtspServer::startServer(int port)
         return false;
     }
 
-    // ½¨Á¢Ì×½Ó¿Ú¶ÓÁĞ
-    ret = listen(socket_fd, 100); //Èç¹ûÁ¬½ÓÊıÄ¿´ï´ËÉÏÏŞ(100)Ôòclient¶Ë½«ÊÕµ½ECONNREFUSEDµÄ´íÎó¡£
+    // å»ºç«‹å¥—æ¥å£é˜Ÿåˆ—
+    ret = listen(socket_fd, 100); //å¦‚æœè¿æ¥æ•°ç›®è¾¾æ­¤ä¸Šé™(100)åˆ™clientç«¯å°†æ”¶åˆ°ECONNREFUSEDçš„é”™è¯¯ã€‚
     if (ret < 0)
     {
         RTSP_LogPrintf("listen socket failed : %s\n", strerror(errno));
@@ -59,12 +59,12 @@ bool RtspServer::startServer(int port)
         return false;
     }
 
-    ////KeepAliveÊµÏÖ£¬µ¥Î»Ãë
-    //ÏÂÃæ´úÂëÒªÇóÓĞACE,Èç¹ûÃ»ÓĞ°üº¬ACE,ÔòÇë°ÑÓÃµ½µÄACEº¯Êı¸Ä³ÉlinuxÏàÓ¦µÄ½Ó¿Ú
-    int keepAlive = 1;//Éè¶¨KeepAlive
-    int keepIdle = 5;//¿ªÊ¼Ê×´ÎKeepAliveÌ½²âÇ°µÄTCP¿Õ±ÕÊ±¼ä
-    int keepInterval = 5;//Á½´ÎKeepAliveÌ½²â¼äµÄÊ±¼ä¼ä¸ô
-    int keepCount = 3;//ÅĞ¶¨¶Ï¿ªÇ°µÄKeepAliveÌ½²â´ÎÊı
+    ////KeepAliveå®ç°ï¼Œå•ä½ç§’
+    //ä¸‹é¢ä»£ç è¦æ±‚æœ‰ACE,å¦‚æœæ²¡æœ‰åŒ…å«ACE,åˆ™è¯·æŠŠç”¨åˆ°çš„ACEå‡½æ•°æ”¹æˆlinuxç›¸åº”çš„æ¥å£
+    int keepAlive = 1;//è®¾å®šKeepAlive
+    int keepIdle = 5;//å¼€å§‹é¦–æ¬¡KeepAliveæ¢æµ‹å‰çš„TCPç©ºé—­æ—¶é—´
+    int keepInterval = 5;//ä¸¤æ¬¡KeepAliveæ¢æµ‹é—´çš„æ—¶é—´é—´éš”
+    int keepCount = 3;//åˆ¤å®šæ–­å¼€å‰çš„KeepAliveæ¢æµ‹æ¬¡æ•°
 //    if(setsockopt(socket_fd,SOL_SOCKET,SO_KEEPALIVE,(void*)&keepAlive,sizeof(keepAlive)) == -1)
     if(setsockopt(socket_fd,SOL_SOCKET,SO_KEEPALIVE,(char*)&keepAlive,sizeof(keepAlive)) == -1)
     {
@@ -92,7 +92,7 @@ bool RtspServer::startServer(int port)
 
     mSockFd = socket_fd;
 
-    ///Æô¶¯¼àÌıÏß³Ì
+    ///å¯åŠ¨ç›‘å¬çº¿ç¨‹
     this->start();
 
     return true;
@@ -114,11 +114,11 @@ void RtspServer::threadFunc()
     {
         const int &socket_fd = mSockFd;
 
-        fd_set fdsr;  //¼à¿ØÎÄ¼şÃèÊö·û¼¯ºÏ
+        fd_set fdsr;  //ç›‘æ§æ–‡ä»¶æè¿°ç¬¦é›†åˆ
         FD_ZERO(&fdsr);
         FD_SET(socket_fd, &fdsr);
 
-        int maxsock = socket_fd;//¼à¿ØÎÄ¼şÃèÊö·û¼¯ºÏÖĞ×î´óµÄÎÄ¼şºÅ
+        int maxsock = socket_fd;//ç›‘æ§æ–‡ä»¶æè¿°ç¬¦é›†åˆä¸­æœ€å¤§çš„æ–‡ä»¶å·
 
         for (const RtspClient* rtspClient : mRtspClientList)
         {
@@ -130,8 +130,8 @@ void RtspServer::threadFunc()
             }
         }
 
-//        struct timeval tv; //Select³¬Ê±·µ»ØµÄÊ±¼ä¡£
-//        tv.tv_sec = 30; // ³¬Ê±ÉèÖÃ30Ãë
+//        struct timeval tv; //Selectè¶…æ—¶è¿”å›çš„æ—¶é—´ã€‚
+//        tv.tv_sec = 30; // è¶…æ—¶è®¾ç½®30ç§’
 //        tv.tv_usec = 0;
 //        int ret = select(maxsock + 1, &fdsr, NULL, NULL, &tv);
         int ret = select(maxsock + 1, &fdsr, NULL, NULL, NULL);
@@ -150,8 +150,8 @@ void RtspServer::threadFunc()
             break;
         }
 
-        // ¼ì²éÊÇ·ñÓĞĞÂÁ¬½Ó½øÀ´£¬Èç¹ûÓĞĞÂÁ¬½Ó½øÀ´£¬½ÓÊÕÁ¬½Ó£¬Éú³ÉĞÂsocket£¬
-        //²¢¼ÓÈëµ½¼à¿ØÎÄ¼şÃèÊö·û¼¯ºÏÖĞ¡£
+        // æ£€æŸ¥æ˜¯å¦æœ‰æ–°è¿æ¥è¿›æ¥ï¼Œå¦‚æœæœ‰æ–°è¿æ¥è¿›æ¥ï¼Œæ¥æ”¶è¿æ¥ï¼Œç”Ÿæˆæ–°socketï¼Œ
+        //å¹¶åŠ å…¥åˆ°ç›‘æ§æ–‡ä»¶æè¿°ç¬¦é›†åˆä¸­ã€‚
         if (FD_ISSET(socket_fd, &fdsr))
         {
             int len = sizeof(remoteaddr);
@@ -185,7 +185,7 @@ void RtspServer::threadFunc()
             continue;
         }
 
-        ///ÅĞ¶ÏÊÇ·ñÓĞĞÂÏûÏ¢
+        ///åˆ¤æ–­æ˜¯å¦æœ‰æ–°æ¶ˆæ¯
         std::list<RtspClient*>::iterator iter;
         for(iter=mRtspClientList.begin(); iter!=mRtspClientList.end();)
         {
@@ -195,7 +195,7 @@ void RtspServer::threadFunc()
 
             const int client_sockfd = rtspClient->getSocketFd();
 
-            ///¼ì²éfdsetÁªÏµµÄÎÄ¼ş¾ä±úfdÊÇ·ñ¿É¶ÁĞ´£¬ >0±íÊ¾¿É¶ÁĞ´¡£
+            ///æ£€æŸ¥fdsetè”ç³»çš„æ–‡ä»¶å¥æŸ„fdæ˜¯å¦å¯è¯»å†™ï¼Œ >0è¡¨ç¤ºå¯è¯»å†™ã€‚
             if (!FD_ISSET(client_sockfd, &fdsr))
             {
                 continue;
@@ -235,7 +235,7 @@ void RtspServer::threadFunc()
             }
             else
             {
-                RTSP_LogPrintf("recv data: %s \n", data);
+                RTSP_LogPrintf("######### recv data: %s \n", data);
 
                 rtspClient->dealwithReceiveBuffer(data, size);
             }

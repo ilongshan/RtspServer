@@ -11,7 +11,8 @@ SOURCES += \
     $$PWD/src/RTSP/RtspSession.cpp \
     $$PWD/src/Base64/Base64.cpp \
     $$PWD/src/SDP/RtspSdp.cpp \
-    $$PWD/src/RTP/RtpConnection.cpp
+    $$PWD/src/RTP/RtpConnection.cpp \
+    $$PWD/src/H264/h264.cpp
 
 HEADERS += \
     $$PWD/src/types.h \

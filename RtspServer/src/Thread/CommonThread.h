@@ -5,7 +5,7 @@
 
 /**
  * @brief The CommonThread class
- * 一直循环执行一个函数的线程
+ * 涓�鐩村惊鐜墽琛屼竴涓嚱鏁扮殑绾跨▼
  */
 
 class CommonThread

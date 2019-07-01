@@ -1,5 +1,5 @@
 /*
- *  从librtmp偷过来的
+ *  浠巐ibrtmp鍋疯繃鏉ョ殑
  */
 
 #ifndef __RTSP_LOG_H__

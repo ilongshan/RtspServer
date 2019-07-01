@@ -34,22 +34,22 @@ public:
     static int VERSION;
     static char VERSION_NAME[32];
 
-    static void mkdir(char *dirName); //´´½¨ÎÄ¼ş¼Ğ
-    static void mkpath(char *path);   //´´½¨¶à¼¶ÎÄ¼ş¼Ğ
+    static void mkdir(char *dirName); //åˆ›å»ºæ–‡ä»¶å¤¹
+    static void mkpath(char *path);   //åˆ›å»ºå¤šçº§æ–‡ä»¶å¤¹
 
     static void removeDir(char *dirName);
     static void removeFile(const char *filePath);
 
     static void copyFile(const char *srcFile, const char *destFile);
 
-    static void replaceChar(char *string, char oldChar, char newChar); //×Ö·û´®Ìæ»»×Ö·û
-    static std::string removeFirstAndLastSpace(std::string &s); //ÒÆ³ı¿ªÊ¼ºÍ½áÊøµÄ¿Õ¸ñ
+    static void replaceChar(char *string, char oldChar, char newChar); //å­—ç¬¦ä¸²æ›¿æ¢å­—ç¬¦
+    static std::string removeFirstAndLastSpace(std::string &s); //ç§»é™¤å¼€å§‹å’Œç»“æŸçš„ç©ºæ ¼
 
-    static std::string getIpFromRtspUrl(std::string rtspUrl); //´ÓrtspµØÖ·ÖĞ»ñÈ¡ipµØÖ·
+    static std::string getIpFromRtspUrl(std::string rtspUrl); //ä»rtspåœ°å€ä¸­è·å–ipåœ°å€
 
     static void mSleep(int mSecond);
 
-    static int64_t getTimeStamp_MilliSecond(); //»ñÈ¡Ê±¼ä´Á£¨ºÁÃë£©
+    static int64_t getTimeStamp_MilliSecond(); //è·å–æ—¶é—´æˆ³ï¼ˆæ¯«ç§’ï¼‰
 
     static RtspServer *gRtspServer;
 

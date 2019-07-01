@@ -1,6 +1,6 @@
 /**
- * Ò¶º£»Ô
- * QQÈº121376426
+ * å¶æµ·è¾‰
+ * QQç¾¤121376426
  * http://blog.yundiantech.com/
  */
 
@@ -24,6 +24,30 @@ typedef struct
     /**//* bytes 8-11 */
     unsigned long ssrc;            /**//* stream number is used here. */
 } RTP_FIXED_HEADER;
+
+//struct rtphdr
+//{
+//#ifdef __BIG_ENDIAN__
+//	uint16_t v:2;
+//	uint16_t p:1;
+//	uint16_t x:1;
+//	uint16_t cc:4;
+//	uint16_t m:1;
+//	uint16_t pt:7;
+//#else
+//	uint16_t cc:4;
+//	uint16_t x:1;
+//	uint16_t p:1;
+//	uint16_t v:2;
+//	uint16_t pt:7;
+//	uint16_t m:1;
+//#endif
+//	uint16_t seq;
+//	uint32_t ts;
+//	uint32_t ssrc;
+//};
+
+//#define RTPHDR_SIZE (12)
 
 typedef struct {
     //byte 0
