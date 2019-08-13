@@ -122,7 +122,7 @@ void readH264File(RtspSession * rtspSession)
                 ///sps不计入帧数统计，不用于计算pts
                 if (type == 7)
                 {
-                    RTSP_LogPrintf("is sps len=%d\n", len);
+//                    RTSP_LogPrintf("is sps len=%d\n", len);
                 }
                 else if (type == 8)
                 {
@@ -198,8 +198,6 @@ int main()
     AppConfig::gRtspServer = mRtspServer;
 
     RtspSession * rtspSession = mRtspServer->newSession("/live/chn1", true, true);
-
-    startTime = AppConfig::getTimeStamp_MilliSecond();
 
     //启动新的线程读取视频文件
     std::thread([&](RtspSession * rtspSession)
