@@ -9,7 +9,11 @@
 
 #include <thread>
 
-uint64_t startTime = AppConfig::getTimeStamp_MilliSecond();
+#define VIDEO_SAMPLE_RATE 90000
+#define AUDIO_FRAME_SIZE 320
+#define AUDIO_SAMPLE_RATE 8000
+
+uint64_t audioPts = 0;
 
 //输出NALU长度和TYPE
 void dump(NALU_t *n)
@@ -18,7 +22,7 @@ void dump(NALU_t *n)
 
     RTSP_LogPrintf(" len: %d nal_unit_type: %x\n", n->len, n->nal_unit_type);
 }
- 
+
 void readH264File(RtspSession * rtspSession)
 {
     FILE *fp = fopen("../BarbieGirl.h264", "rb");
@@ -31,8 +35,6 @@ void readH264File(RtspSession * rtspSession)
     int frameNum = 0; //当前播放的帧序号
     int frameRate = 0; //帧率
 
-    uint64_t ts = 0;
-
     h264Reader *mH264Reader = new h264Reader();
 
     while(1)
@@ -40,7 +42,14 @@ void readH264File(RtspSession * rtspSession)
         char buf[10240] = {0};
         int size = fread(buf, 1, 1024, fp);//从h264文件读1024个字节 (模拟从网络收到h264流)
 
-        if (size <= 0) fseek(fp, 0, SEEK_SET);
+        if (size <= 0)
+        {
+            RTSP_LogPrintf("readH264File finished! \n");
+
+            fseek(fp, 0, SEEK_SET);
+            Sleep(1000);
+            continue;
+        }
 
         int nCount = mH264Reader->inputH264Data((uchar*)buf,size);
 
@@ -55,6 +64,7 @@ void readH264File(RtspSession * rtspSession)
 
 //            dump(nalu);
 
+            ///计算帧率
             if (frameRate <= 0)
             {
                 uint8_t type = 0;
@@ -100,25 +110,42 @@ void readH264File(RtspSession * rtspSession)
 
             }
 
-            frameNum++;
+            ///统计帧数
+            {
+                uint8_t type = 0;
 
-#define AUDIO_SAMPLE_RATE 90000
+                int len = nalu->len;
 
-            rtspSession->sendH264Buffer(h264Buf, h264BufSize, ts, AUDIO_SAMPLE_RATE);
+                type = nalu->buf[0] & 0x1f;
+                len -= nalu->forbidden_bit;
+
+                ///sps不计入帧数统计，不用于计算pts
+                if (type == 7)
+                {
+                    RTSP_LogPrintf("is sps len=%d\n", len);
+                }
+                else if (type == 8)
+                {
+//                    RTSP_LogPrintf("is pps len=%d\n", len);
+                    frameNum++;
+                }
+                else
+                {
+                    frameNum++;
+                }
+            }
 
             /// h264裸数据不包含时间戳信息  因此只能根据帧率做同步
             /// 需要成功解码一帧后 才能获取到帧率
-            /// 为0说明还没获取到 则直接显示
-            uint64_t currentTime = AppConfig::getTimeStamp_MilliSecond();
-            if (frameRate != 0)
-            {
-                int sleepTime = (1000/frameRate * frameNum) - (currentTime - startTime);
+            uint64_t videoPts = (1000000 / frameRate * frameNum); //微秒
 
-                if (sleepTime>0)
-                    Sleep(sleepTime);
+            ///根据音频时间戳做同步。
+            while (videoPts > audioPts || audioPts <= 0)
+            {
+                Sleep(5);
             }
 
-            ts = (currentTime - startTime) * 1000; //微秒
+            rtspSession->sendH264Buffer(h264Buf, h264BufSize, videoPts, VIDEO_SAMPLE_RATE);
 
             FreeNALU(nalu); //释放NALU内存
 
@@ -136,26 +163,27 @@ void readG711AFile(RtspSession * rtspSession)
         exit(-1);
     }
 
-    uint64_t ts = 0;
 
-
-#define AUDIO_FRAME_SIZE 320
-#define AUDIO_SAMPLE_RATE 8000
 
     while(1)
     {
         char buf[10240] = {0};
         int size = fread(buf, 1, AUDIO_FRAME_SIZE, fp);//从h264文件读1024个字节 (模拟从网络收到h264流)
 
-        if (size <= 0) fseek(fp, 0, SEEK_SET);
+        if (size <= 0)
+        {
+            RTSP_LogPrintf("readG711AFile finished! \n");
 
-        uint64_t currentTime = AppConfig::getTimeStamp_MilliSecond();
+            fseek(fp, 0, SEEK_SET);
+            Sleep(1000);
+            continue;
+        }
 
-        ts = (currentTime - startTime) * 1000;
+        audioPts += 1000000 / 25;
 
         Sleep(1000 / 25);
 
-        rtspSession->sendG711A((uint8_t*)buf, AUDIO_FRAME_SIZE, ts, AUDIO_SAMPLE_RATE);
+        rtspSession->sendG711A((uint8_t*)buf, AUDIO_FRAME_SIZE, audioPts, AUDIO_SAMPLE_RATE);
 
     }
 }
@@ -169,7 +197,7 @@ int main()
 
     AppConfig::gRtspServer = mRtspServer;
 
-    RtspSession * rtspSession = mRtspServer->newSession("/live/chn1", false, true);
+    RtspSession * rtspSession = mRtspServer->newSession("/live/chn1", true, true);
 
     startTime = AppConfig::getTimeStamp_MilliSecond();
 
