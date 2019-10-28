@@ -1,5 +1,7 @@
 #include "RtspSession.h"
 
+#include <algorithm>
+
 #include "RtspClient.h"
 #include "Log/log.h"
 
@@ -34,6 +36,18 @@ bool RtspSession::sendG711A(const uint8_t *frame, int len, uint64_t timestamp, u
     for (RtspClient* rtspClient : mRtspClientList)
     {
         rtspClient->sendG711A(frame, len, timestamp, sample_rate);
+    }
+    mCond_RtspClient->Unlock();
+
+    return true;
+}
+
+bool RtspSession::sendAACBuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    mCond_RtspClient->Lock();
+    for (RtspClient* rtspClient : mRtspClientList)
+    {
+        rtspClient->sendAACBuffer(frame, len, timestamp, sample_rate);
     }
     mCond_RtspClient->Unlock();
 

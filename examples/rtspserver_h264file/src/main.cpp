@@ -7,6 +7,8 @@
 #include "H264/h264reader.h"
 #include "H264/h264decoder.h"
 
+#include "AAC/AACReader.h"
+
 #include <thread>
 
 #define VIDEO_SAMPLE_RATE 90000
@@ -26,6 +28,7 @@ void dump(NALU_t *n)
 void readH264File(RtspSession * rtspSession)
 {
     FILE *fp = fopen("../BarbieGirl.h264", "rb");
+//    FILE *fp = fopen("E:/out.h264", "rb");
     if (fp == NULL)
     {
         RTSP_LogPrintf("H264 file not exist!");
@@ -164,6 +167,14 @@ void readG711AFile(RtspSession * rtspSession)
     }
 
 
+//    G711的打包周期分为10ms,20ms,30ms,sample rate是8000，速率是64kbit/s
+//    64kbits,意味着每秒发送64000比特
+//    那么10ms发送= 64000 * (10/1000) = 640 比特 = 80 字节
+//    那么10ms的包 = 80字节
+//    20ms = 160 字节
+//    30ms = 240 字节
+//    40oms = 320 字节
+//    这里每40ms发送一次数据（320字节）
 
     while(1)
     {
@@ -187,6 +198,53 @@ void readG711AFile(RtspSession * rtspSession)
 
     }
 }
+
+void readAACFile(RtspSession * rtspSession)
+{
+    FILE *fp = fopen("../test.aac", "rb");
+    if (fp == NULL)
+    {
+        RTSP_LogPrintf("AAC file not exist!");
+        exit(-1);
+    }
+
+    AACReader *mAACReader = new AACReader();
+
+    while(1)
+    {
+        char buf[10240] = {0};
+        int size = fread(buf, 1, 1024, fp);//从h264文件读1024个字节 (模拟从网络收到h264流)
+
+        if (size <= 0)
+        {
+            RTSP_LogPrintf("readAACFile finished! \n");
+
+            fseek(fp, 0, SEEK_SET);
+            Sleep(1000);
+            continue;
+        }
+
+        int nCount = mAACReader->inputAACData((uchar*)buf, size);
+
+        while(1)
+        {
+            //从前面读到的数据中获取一帧音频数据
+            AACFrame* aacFrame = mAACReader->getNextFrame();
+            if (aacFrame == NULL) break;
+
+//            audioPts += 1000000 / 43;
+            audioPts += 6000;
+
+            Sleep(6);
+
+//            rtspSession->sendAACBuffer((uint8_t*)buf, AUDIO_FRAME_SIZE, audioPts, AUDIO_SAMPLE_RATE);
+            rtspSession->sendAACBuffer((uint8_t*)aacFrame->buffer, aacFrame->bufferSize, audioPts, 44100);
+
+            FreeAACFrame(aacFrame);
+        }
+    }
+}
+
 
 int main()
 {
@@ -212,6 +270,13 @@ int main()
         readG711AFile(rtspSession);
 
     }, rtspSession).detach();
+
+//    //启动新的线程读取音频文件（发送aac的暂时还有问题，以后有时间再处理）
+//    std::thread([&](RtspSession * rtspSession)
+//    {
+//        readAACFile(rtspSession);
+
+//    }, rtspSession).detach();
 
     while(1) Sleep(1000);
 

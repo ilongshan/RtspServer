@@ -73,6 +73,20 @@ bool RtspClient::sendG711A(const uint8_t *frame, int len, uint64_t timestamp, ui
     return isSucceed;
 }
 
+bool RtspClient::sendAACBuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    bool isSucceed = false;
+
+    mCond_RtpSocket->Lock();
+
+    if (artp != nullptr)
+        isSucceed = artp->sendAACBuffer(frame, len, timestamp, sample_rate);
+
+    mCond_RtpSocket->Unlock();
+
+    return isSucceed;
+}
+
 int RtspClient::dealwithReceiveBuffer(const char *buffer, const int &bufferLen)
 {
     memcpy(mMsgBuffer + mMsgLen, buffer, bufferLen);
@@ -397,6 +411,7 @@ int RtspClient::rtspHandleSETUP(const rtsp_msg_s *reqmsg, rtsp_msg_s *resmsg)
 
     snprintf(vpath, sizeof(vpath) - 1, "%s/track1", s->getSessionPath().c_str());
     snprintf(apath, sizeof(vpath) - 1, "%s/track2", s->getSessionPath().c_str());
+
     if (s->has_video && 0 == strncmp(reqmsg->hdrs.startline.reqline.uri.abspath, vpath, strlen(vpath)))
     {
         isaudio = 0;

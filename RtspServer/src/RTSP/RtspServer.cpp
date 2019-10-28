@@ -156,8 +156,11 @@ void RtspServer::threadFunc()
         {
             int len = sizeof(remoteaddr);
 
-//            int client_sockfd = accept(socket_fd,(struct sockaddr *)&remoteaddr, (socklen_t*)&len);
+#if defined(WIN32)
             int client_sockfd = accept(socket_fd,(struct sockaddr *)&remoteaddr, &len);
+#else
+            int client_sockfd = accept(socket_fd,(struct sockaddr *)&remoteaddr, (socklen_t*)&len);
+#endif
 
             if (client_sockfd > 0)
             {

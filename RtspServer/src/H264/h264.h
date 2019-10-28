@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string>
 
+#pragma pack(1)
+
 typedef struct
 {
   int startcodeprefix_len;      //! 4 for parameter sets and first slice in picture, 3 for everything else (suggested)
@@ -31,6 +33,8 @@ typedef struct {
     unsigned char F:1;
 
 } NALU_HEADER; /**//* 1 BYTES */
+
+#pragma pack ()
 
 //为NALU_t结构体分配内存空间
 NALU_t *AllocNALU(int buffersize);

@@ -7,6 +7,8 @@
 #ifndef RTP_H
 #define RTP_H
 
+#pragma pack(1)
+
 typedef struct
 {
     /**//* byte 0 */
@@ -66,5 +68,6 @@ typedef struct {
         unsigned char S:1;
 } FU_HEADER; /**//* 1 BYTES */
 
+#pragma pack ()
 
 #endif // RTP_H

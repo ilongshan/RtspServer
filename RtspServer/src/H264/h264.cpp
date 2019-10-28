@@ -1,5 +1,7 @@
 #include "h264.h"
 
+#include <string.h>
+
 //为NALU_t结构体分配内存空间
 NALU_t *AllocNALU(int buffersize)
 {

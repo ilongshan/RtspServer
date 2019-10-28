@@ -5,6 +5,7 @@
 #include "AppConfig.h"
 
 #define RTP_HEADER_SIZE 12
+#define POCKT_MAX_LEN 255
 
 #define H264   96
 #define AAC    97
@@ -423,3 +424,57 @@ bool RtpConnection::sendG711ABuffer(const uint8_t *frame, int len, uint64_t time
 
     return isSucceed;
 }
+
+bool RtpConnection::sendAACBuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate)
+{
+    bool isSucceed = false;
+
+    uint32_t rtp_ts = (uint32_t)(timestamp * sample_rate / 1000000);
+
+    uint8_t sendbuf[1500] = {0};
+
+    int aacBufLen = len;
+
+
+//rtp固定包头，为12字节,该句将sendbuf[0]的地址赋给rtp_hdr，以后对rtp_hdr的写入操作将直接写入sendbuf。
+    RTP_FIXED_HEADER* rtp_hdr =(RTP_FIXED_HEADER*)sendbuf; //设置RTP HEADER，
+    rtp_hdr->payload    = AAC;  //负载类型号，
+    rtp_hdr->version    = 2;  //版本号，此版本固定为2
+    rtp_hdr->marker     = 0;   //标志位，由具体协议规定其值。
+    rtp_hdr->ssrc       = htonl(ssrc);    //在本RTP会话中全局唯一
+    rtp_hdr->seq_no     = htons(seq_num ++); //序列号，每发送一个RTP包增1
+    rtp_hdr->timestamp  = htonl(rtp_ts);
+
+    //将要发送的数据填入sendbuf[12]
+//        memcpy(&sendbuf[RTP_HEADER_SIZE], frame + pos, aacBufLen);
+
+    sendbuf[RTP_HEADER_SIZE] = 0x00;
+    sendbuf[RTP_HEADER_SIZE + 1] = 0x10;
+
+    sendbuf[RTP_HEADER_SIZE + 2] = (len & 0x1fe0) >> 5;
+    sendbuf[RTP_HEADER_SIZE + 3] = (len & 0x1f) << 3;
+
+    memcpy(&sendbuf[RTP_HEADER_SIZE+4], frame, aacBufLen);
+
+    int finalSendLen = len + 4;
+
+//        if (aacBufLen < POCKT_MAX_LEN)
+//        {
+//            finalSendLen = aacBufLen + RTP_HEADER_SIZE + 1;
+//            sendbuf[RTP_HEADER_SIZE] = aacBufLen;
+//            memcpy(sendbuf + RTP_HEADER_SIZE + 1, frame, aacBufLen);
+//        }
+//        else if (aacBufLen >= POCKT_MAX_LEN)
+//        {
+//            finalSendLen = aacBufLen + RTP_HEADER_SIZE + 2;
+//            sendbuf[RTP_HEADER_SIZE] = POCKT_MAX_LEN ;
+//            sendbuf[RTP_HEADER_SIZE+1] = aacBufLen % POCKT_MAX_LEN;
+//            memcpy(sendbuf + RTP_HEADER_SIZE + 2, frame, aacBufLen);
+//        }
+
+//fprintf(stderr, "%d %d \n", len, finalSendLen);
+    isSucceed = doSend(sendbuf, finalSendLen);
+
+    return isSucceed;
+}
+

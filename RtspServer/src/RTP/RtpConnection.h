@@ -44,6 +44,16 @@ public:
      */
     bool sendG711ABuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
 
+    /**
+     * @brief sendAACBuffer
+     * @param frame
+     * @param len
+     * @param timestamp   时间戳，相对于1,1000 的时间戳
+     * @param sample_rate 采样率 H264设置为90000， 音频为实际采样率比如：44100
+     * @return
+     */
+    bool sendAACBuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
+
 private:
     unsigned short seq_num =0;
 

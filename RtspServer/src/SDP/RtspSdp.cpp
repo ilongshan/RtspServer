@@ -66,7 +66,7 @@ int RtspSdp::buildSimpleSdp (char *sdpbuf, int maxlen, const char *uri, int has_
 
     p += sprintf(p, "v=0\r\n");
     p += sprintf(p, "o=- 0 0 IN IP4 0.0.0.0\r\n");
-    p += sprintf(p, "s=h264+pcm_alaw\r\n");
+//    p += sprintf(p, "s=h264+pcm_alaw\r\n");
     p += sprintf(p, "t=0 0\r\n");
     p += sprintf(p, "a=control:%s\r\n", uri ? uri : "*");
     p += sprintf(p, "a=range:npt=0-\r\n");
@@ -108,11 +108,45 @@ int RtspSdp::buildSimpleSdp (char *sdpbuf, int maxlen, const char *uri, int has_
             p += sprintf(p, "a=control:track1\r\n");
     }
 
-    if (has_audio) {
-//		p += sprintf(p, "m=audio 0 RTP/AVP 8\r\n"); //PCMA/8000/1 (G711A)
+//    if (has_audio)
+//    {
+////		p += sprintf(p, "m=audio 0 RTP/AVP 8\r\n"); //PCMA/8000/1 (G711A)
+//        p += sprintf(p, "m=audio 0 RTP/AVP 97\r\n");
+//        p += sprintf(p, "c=IN IP4 0.0.0.0\r\n");
+//        p += sprintf(p, "a=rtpmap:97 PCMA/8000/1\r\n");
+//        if (uri)
+//            p += sprintf(p, "a=control:%s/track2\r\n", uri);
+//        else
+//            p += sprintf(p, "a=control:track2\r\n");
+//    }
+
+    if (has_audio)
+    {
+//        config=1188
+        int profile = 1;
+        int samplingFrequencyIndex = 3; //48000
+        int channelConfiguration = 1; //当通道
+
+        unsigned char audioSpecificConfig[2];
+        uint8_t const audioObjectType = profile + 1;
+        audioSpecificConfig[0] = (audioObjectType<<3) | (samplingFrequencyIndex>>1);
+        audioSpecificConfig[1] = (samplingFrequencyIndex<<7) | (channelConfiguration<<3);
+
+        char fConfigStr[6] = {0};
+        sprintf(fConfigStr, "%02X%02x", audioSpecificConfig[0], audioSpecificConfig[1]);
+        fprintf(stderr, "\n\n\n############ \n %s \n ############### \n\n\n", fConfigStr);
+
+//        p += sprintf(p, "m=audio 0 RTP/AVP 97\r\n");
+//        p += sprintf(p, "c=IN IP4 0.0.0.0\r\n");
+//        p += sprintf(p, "a=rtpmap:97 mpeg4-generic/48000/1\r\n");
+//        p += sprintf(p, "a=fmtp:97 streamtype=5; profile-level-id=15; mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=118856e500; Profile=1;\r\n");
+//        p += sprintf(p, "a=Media_header:MEDIAINFO=494D4B4801010000040000010120011080BB000000FA000000000000000000000000000000000000;\r\n");
+
         p += sprintf(p, "m=audio 0 RTP/AVP 97\r\n");
         p += sprintf(p, "c=IN IP4 0.0.0.0\r\n");
-        p += sprintf(p, "a=rtpmap:97 PCMA/8000/1\r\n");
+        p += sprintf(p, "a=rtpmap:97 mpeg4-generic/44100/2\r\n");
+        p += sprintf(p, "a=fmtp:97 SizeLength=13;\r\n");
+
         if (uri)
             p += sprintf(p, "a=control:%s/track2\r\n", uri);
         else

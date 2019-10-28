@@ -6,6 +6,19 @@
     #include <windows.h>
 #else
     #include <pthread.h>
+    #include <errno.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+   #include <netinet/in.h>
+   #include <arpa/inet.h>
+
+#endif
+
+
+#if defined(WIN32)
+#else
+    #define closesocket close
 #endif
 
 #include <stdio.h>

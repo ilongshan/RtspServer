@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <string.h>
 #include <list>
 
 #include "Mutex/Cond.h"
@@ -29,6 +30,8 @@ public:
     bool sendH264Buffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
 
     bool sendG711A(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
+
+    bool sendAACBuffer(const uint8_t *frame, int len, uint64_t timestamp, uint32_t sample_rate);
 
 private:
     std::string mSessionPath; //会话路径
